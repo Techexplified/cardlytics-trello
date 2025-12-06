@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  </head>
+  <body>
+    <h3>Create Dashcard</h3>
+
+    <label>Keyword Filter</label>
+    <input id="filter" type="text" />
+
+    <button id="save">Save</button>
+
+    <script>
+      var t = TrelloPowerUp.iframe();
+
+      document.getElementById('save').onclick = function() {
+        const filter = document.getElementById('filter').value;
+
+        return t.card('id').then(card => {
+          return t.set('card', 'shared', { filter }).then(() => {
+            t.closePopup();
+          });
+        });
+      };
+    </script>
+  </body>
+</html>

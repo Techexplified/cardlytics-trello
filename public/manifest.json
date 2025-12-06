@@ -1,0 +1,19 @@
+{
+  "name": "My Dashcards PowerUp",
+  "description": "A custom Power-Up built with React.",
+  "author": "You",
+  "capabilities": [
+    "board-buttons",
+    "card-badges",
+    "show-settings",
+    "modals",
+    "card-buttons"
+  ],
+  "connectors": {
+    "iframe": {
+      "url": "./",
+      "js": ["./client.js"],
+      "css": []
+    }
+  }
+}
