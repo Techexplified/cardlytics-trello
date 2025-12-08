@@ -4,12 +4,20 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>trello-powerup</title>
-    <script src="https://p.trellocdn.com/power-up.min.js"></script>
-    <script src="/client.js"></script>
+    <title>DashFlow Power-Up</title>
   </head>
+
   <body>
+    <!-- Optional: your normal SPA root -->
     <div id="root"></div>
+
+    <!-- (1) Your normal SPA entry (if you have a separate main) -->
     <script type="module" src="/src/main.jsx"></script>
+
+
+    <script src="https://p.trellocdn.com/power-up.min.js"></script>
+
+   
+    <script type="module" src="/src/trello-entry.jsx"></script>
   </body>
 </html>

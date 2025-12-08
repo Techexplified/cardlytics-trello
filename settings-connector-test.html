@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Connector test</title>
+    <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  </head>
+  <body>
+    <div>Connector test — ready</div>
+    <script>
+      // Register a very small handler so Trello sees a plugin
+      window.TrelloPowerUp &&
+        window.TrelloPowerUp.initialize({
+          'show-settings': function (t, opts) {
+            // return URL or popup spec; using a tiny popup
+            return { url: '/settings.html', height: 200 };
+          },
+        });
+      console.log('TrelloPowerUp.initialize called (test connector).');
+    </script>
+  </body>
+</html>
