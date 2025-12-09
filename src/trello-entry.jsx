@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
-// The Trello client library must be loaded via <script> tag in HTML first.
-// We keep this declaration synchronous as required, but rely minimally on it
-// for the capabilities array construction below.
 const TrelloPowerUp = window.TrelloPowerUp;
 
 const DEPLOY_URL = "https://statuesque-sfogliatella-0c9a46.netlify.app";
@@ -48,15 +45,12 @@ if (typeof window !== "undefined" && window.TrelloPowerUp && window.TrelloPowerU
 	try {
 		window.TrelloPowerUp.initialize({
 
-			// Reverting to the simplest, most reliable handler style.
 			"card-buttons": function (t) {
 				return [
 					{
-						// Using a generic Trello icon constant ID (e.g., 'attachment')
 						icon: 'attachment',
 						text: "Configure DashCard",
 						callback: function (t) {
-							// FIX: Using the hardcoded HTTPS URL for configuration popup
 							return t.popup({
 								title: "DashCard Setup",
 								url: `${DEPLOY_URL}/popup.html`,
@@ -87,11 +81,9 @@ if (typeof window !== "undefined" && window.TrelloPowerUp && window.TrelloPowerU
 			"board-buttons": function (t) {
 				return [
 					{
-						// Using a generic Trello icon constant ID (e.g., 'attachment')
 						icon: 'attachment',
 						text: "DashFlow Dashboard",
 						callback: function (t) {
-							// FIX: Using the hardcoded HTTPS URL for the modal
 							return t.modal({
 								title: "Board Dashboard",
 								url: `${DEPLOY_URL}/dashboard.html`,
@@ -102,33 +94,11 @@ if (typeof window !== "undefined" && window.TrelloPowerUp && window.TrelloPowerU
 					},
 				];
 			},
-
-			"show-settings": function (t) {
-				return {
-					// FIX: Using the hardcoded HTTPS URL for settings
-					url: `${DEPLOY_URL}/settings.html`,
-					height: 240
-				};
-			},
 		});
 		console.log("TrelloPowerUp.initialize called (registered handlers).");
 	} catch (e) {
 		console.warn("Error registering TrelloPowerUp.initialize:", e);
 	}
-}
-
-async function getApiCredentials(t) {
-	try {
-		const saved = await t.get("board", "private", "trelloApi");
-		if (saved && saved.key && saved.token) return saved;
-	} catch (e) {
-		console.warn("No saved API credentials:", e);
-	}
-	const FALLBACK = {
-		key: "",
-		token: "",
-	};
-	return FALLBACK;
 }
 
 function CardUI() {
@@ -276,33 +246,48 @@ function DashboardUI() {
 	const [loading, setLoading] = useState(true);
 	const [summary, setSummary] = useState(null);
 	const [error, setError] = useState(null);
+	const [key, setKey] = useState(null);
+	const [needsAuth, setNeedsAuth] = useState(false);
 
 	useEffect(() => {
-		(async () => {
-			const t = window.TrelloPowerUp && window.TrelloPowerUp.iframe();
-			if (!t) {
-				setError("Trello client unavailable");
+		const t = window.TrelloPowerUp && window.TrelloPowerUp.iframe();
+		if (!t) {
+			setError("Trello client unavailable");
+			setLoading(false);
+			return;
+		}
+
+		const fetchAuthAndData = async () => {
+			const tClient = window.TrelloPowerUp && window.TrelloPowerUp.iframe();
+			if (!tClient) {
+				setError("Trello client unavailable during data fetch.");
 				setLoading(false);
 				return;
 			}
 
 			try {
-				const board = await t.board("id", "name");
-				const creds = await getApiCredentials(t);
-				if (!creds.key || !creds.token) {
-					setError(
-						"No Trello key/token found. Open the Power-Up Settings and save them for this board."
-					);
+				const appKey = '0919ce48a7f8507be8f698a755ffeda';
+				setKey(appKey);
+
+				let userToken = await tClient.get('member', 'private', 'token');
+
+				if (!userToken) {
+					setNeedsAuth(true);
 					setLoading(false);
 					return;
 				}
 
-				const url = `https://api.trello.com/1/boards/${board.id}/cards?fields=name,labels,due&key=${creds.key}&token=${creds.token}`;
+				const board = await tClient.board("id", "name");
+				const url = `https://api.trello.com/1/boards/${board.id}/cards?fields=name,labels,due&key=${appKey}&token=${userToken}`;
 				const res = await fetch(url);
+
 				if (!res.ok) {
-					const text = await res.text();
-					throw new Error(`Trello API error: ${res.status} ${text}`);
+					await tClient.remove('member', 'private', 'token');
+					setNeedsAuth(true);
+					setLoading(false);
+					return;
 				}
+
 				const cards = await res.json();
 
 				const labelCounts = {};
@@ -325,15 +310,65 @@ function DashboardUI() {
 				upcoming.sort((a, b) => new Date(a.due) - new Date(b.due));
 				setSummary({ labelCounts, upcoming });
 				setLoading(false);
+
 			} catch (err) {
 				console.error(err);
 				setError(String(err.message || err));
 				setLoading(false);
 			}
-		})();
+		};
+
+		fetchAuthAndData();
+
 	}, []);
 
+	const authorize = async () => {
+		const t = window.TrelloPowerUp && window.TrelloPowerUp.iframe();
+		if (!t) return;
+
+		const scope = { read: 'true', write: 'false' };
+		const expiration = 'never';
+
+		try {
+			// This opens the Trello auth window. The user is redirected back
+			const userToken = await t.authorize({
+				type: 'requestToken',
+				scope: scope,
+				expiration: expiration,
+				key: key,
+				name: 'DashFlow Clone'
+			});
+
+			await t.set('member', 'private', 'token', userToken);
+
+			// Re-run fetchAuthAndData to refresh UI with the new token
+			// We cannot call fetchAuthAndData directly as it would misuse the client object.
+			// Instead, we force Trello to re-render the dashboard.
+			t.navigate({ url: '/dashboard.html' });
+
+		} catch (e) {
+			setError("Authorization failed. Please ensure popups are enabled and try again.");
+			setNeedsAuth(true);
+		}
+	};
+
 	if (loading) return <div style={{ padding: 12 }}>Loading dashboard…</div>;
+
+	if (needsAuth) {
+		return (
+			<div style={{ padding: 12, fontFamily: "system-ui, Arial", textAlign: 'center' }}>
+				<h3>Authorization Required</h3>
+				<p>This dashboard needs your permission to read cards from your board.</p>
+				<button
+					onClick={authorize}
+					style={{ padding: '10px 20px', backgroundColor: '#0079bf', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}
+				>
+					Authorize Trello Access
+				</button>
+			</div>
+		);
+	}
+
 	if (error) return <div style={{ padding: 12, color: "crimson" }}>{error}</div>;
 	if (!summary) return <div style={{ padding: 12 }}>No data</div>;
 
@@ -381,59 +416,7 @@ function DashboardUI() {
 	);
 }
 
-function SettingsUI() {
-	const [keyVal, setKeyVal] = useState("");
-	const [tokenVal, setTokenVal] = useState("");
-	const [status, setStatus] = useState("");
-	const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe() : null;
-
-	useEffect(() => {
-		if (!t) return;
-		(async () => {
-			try {
-				const saved = await t.get("board", "private", "trelloApi");
-				if (saved) {
-					setKeyVal(saved.key || "");
-					setTokenVal(saved.token || "");
-				}
-			} catch (e) {
-				console.warn(e);
-			}
-		})();
-	}, [t]);
-
-	async function save() {
-		if (!t) return;
-		try {
-			await t.set("board", "private", "trelloApi", { key: keyVal, token: tokenVal });
-			setStatus("Saved.");
-			setTimeout(() => t.closePopup && t.closePopup(), 800);
-		} catch (e) {
-			setStatus("Failed to save: " + e.message);
-		}
-	}
-
-	return (
-		<div style={{ padding: 12, fontFamily: "system-ui, Arial" }}>
-			<h3>Power-Up Settings</h3>
-			<div style={{ marginBottom: 8 }}>
-				<label style={{ display: 'block', marginBottom: '4px' }}>Trello API Key (dev)</label>
-				<input value={keyVal} onChange={(e) => setKeyVal(e.target.value)} style={{ width: "100%", padding: '6px' }} />
-			</div>
-			<div style={{ marginBottom: 8 }}>
-				<label style={{ display: 'block', marginBottom: '4px' }}>Trello Token (dev)</label>
-				<input value={tokenVal} onChange={(e) => setTokenVal(e.target.value)} style={{ width: "100%", padding: '6px' }} />
-			</div>
-			<div>
-				<button onClick={save} style={{ padding: '8px 15px', backgroundColor: '#0079bf', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Save to board</button>
-				<span style={{ marginLeft: 8 }}>{status}</span>
-			</div>
-			<p style={{ marginTop: 8, color: "#666", fontSize: 13 }}>
-				These credentials are stored private to this board in Trello.
-			</p>
-		</div>
-	);
-}
+const ExportTrelloPowerUp = window.TrelloPowerUp;
 
 function mount() {
 	const cardRoot = document.getElementById("trello-card-root");
@@ -452,9 +435,15 @@ function mount() {
 		root.render(<DashboardUI />);
 	} else if (settingsRoot) {
 		const root = createRoot(settingsRoot);
-		root.render(<SettingsUI />);
+		root.render(
+			<div style={{ padding: 12 }}>
+				<h3>Settings Not Needed</h3>
+				<p>Authentication is now handled automatically when accessing the Dashboard.</p>
+			</div>
+		);
 	}
 }
 
-mount();
-export default TrelloPowerUp;
+setTimeout(mount, 0);
+
+export default ExportTrelloPowerUp;
