@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
+// Global Constants (Synchronous)
 const TrelloPowerUp = window.TrelloPowerUp;
+const DEPLOY_URL = "https://localhost:4173";
+const APP_KEY = '0919ce48a7f8507be8f698a755ffeda';
 
-const DEPLOY_URL = "https://trello-app-or33.vercel.app";
+// --- Trello Initialization (Must be synchronous and complete) ---
 
 async function isDashCard(t) {
 	return t.get('card', 'shared', 'isDashCard', false);
@@ -100,6 +103,8 @@ if (typeof window !== "undefined" && window.TrelloPowerUp && window.TrelloPowerU
 		console.warn("Error registering TrelloPowerUp.initialize:", e);
 	}
 }
+
+// --- React Components (Moved outside the initialization flow) ---
 
 function CardUI() {
 	const [card, setCard] = useState(null);
@@ -246,7 +251,6 @@ function DashboardUI() {
 	const [loading, setLoading] = useState(true);
 	const [summary, setSummary] = useState(null);
 	const [error, setError] = useState(null);
-	const [key, setKey] = useState(null);
 	const [needsAuth, setNeedsAuth] = useState(false);
 
 	useEffect(() => {
@@ -266,8 +270,7 @@ function DashboardUI() {
 			}
 
 			try {
-				const appKey = '0919ce48a7f8507be8f698a755ffeda';
-				setKey(appKey);
+				const appKey = APP_KEY; // Use the synchronous global constant
 
 				let userToken = await tClient.get('member', 'private', 'token');
 
@@ -326,31 +329,22 @@ function DashboardUI() {
 		const t = window.TrelloPowerUp && window.TrelloPowerUp.iframe();
 		if (!t) return;
 
-		const scope = { read: 'true', write: 'false' };
-		const expiration = 'never';
-
 		try {
-			// This opens the Trello auth window. The user is redirected back
-			const userToken = await t.authorize({
-				type: 'requestToken',
-				scope: scope,
-				expiration: expiration,
-				key: key,
-				name: 'DashFlow Clone'
+			const token = await t.authorize((secret) => {
+				return `https://trello.com/1/authorize?expiration=never&name=DashFlow%20Clone&scope=read&response_type=token&key=${APP_KEY}&return_url=${encodeURIComponent('https://localhost:4173/dashboard.html')}`;
 			});
 
-			await t.set('member', 'private', 'token', userToken);
+			await t.set("member", "private", "token", token);
 
-			// Re-run fetchAuthAndData to refresh UI with the new token
-			// We cannot call fetchAuthAndData directly as it would misuse the client object.
-			// Instead, we force Trello to re-render the dashboard.
-			t.navigate({ url: '/dashboard.html' });
+			t.navigate({ url: "/dashboard.html" });
 
 		} catch (e) {
+			console.error(e);
 			setError("Authorization failed. Please ensure popups are enabled and try again.");
 			setNeedsAuth(true);
 		}
 	};
+
 
 	if (loading) return <div style={{ padding: 12 }}>Loading dashboard…</div>;
 
