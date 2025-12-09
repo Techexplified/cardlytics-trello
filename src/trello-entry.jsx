@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 
 const TrelloPowerUp = window.TrelloPowerUp;
 
-const DEPLOY_URL = "https://statuesque-sfogliatella-0c9a46.netlify.app";
+const DEPLOY_URL = "https://trello-app-or33.vercel.app";
 
 async function isDashCard(t) {
 	return t.get('card', 'shared', 'isDashCard', false);
