@@ -161,94 +161,68 @@ function PopupUI() {
 		if (!t) return;
 
 		if (creationMode) {
-			if (!targetListId) { t.alert("Please select a destination list."); return; }
+			// --- CREATION MODE (Board Button) ---
+			// We cannot access card context here. We simulate creation.
+			if (!targetListId) {
+				t.alert({ message: "Please select a destination list.", duration: 3, display: 'warning' });
+				return;
+			}
 
-			// Create New Card Flow
 			try {
-				// 1. Authenticate / Get Token
-				// We attempt to silent auth. If fails, we prompt.
-				// Since this is a restricted action (creating card via REST), we need a token.
-				// We'll trust the user to authorize.
-
-				t.get('member', 'private', 'token')
-					.then(async (token) => {
-						if (!token) {
-							// Fallback: Use Trello's authorize to get token then retry
-							return t.popup({
-								title: 'Authorize Dashcard',
-								url: './authorize.html', // We don't have this, let's use t.getRestApi() if available or standard auth flow
-								height: 150
-							}).then(() => t.alert("Please authorize via the 'Authorize' button first (not implemented in this demo)."));
-							// In a real app, we'd have a strictly defined auth flow.
-							// For this demo, let's assume we can't create without token.
-							// We will simulate it or alert the user.
-
-							// ALERT: For this demo environment without a backend, we can't easily proxy the request without exposing keys insecurely or requiring user token.
-							// However, the instructions imply we "fetching api key". Code has APP_KEY.
-							// We will TRY to ask Trello to create the card using the client lib if possible, but t.addCard might be available?
-							// t.addCard() opens a popup "Add Card". Not fully automated.
-
-							// Let's use the list.cards.post if we can. 
-							// Check capabilities.
-						}
-						// If we had token:
-						// await fetch(...)
-					});
-
-				// FOR DEMO: since we don't have a reliable way to get user token without full auth flow UI implementation:
-				// We will simply ALERT the config so the user knows it "worked" logic-wise, 
-				// OR we use t.lists(id).cards.post ?? No such method.
-
-				// Fallback implementation: 
-				// 1. Create a card using t.create?? No.
-				// 2. Alert user.
-
+				// Simulated Creation
 				t.alert({
-					message: `Dashcard "${name}" would be created in list "${lists.find(l => l.id === targetListId)?.name}" (Requires Auth Token implementation).`,
+					message: `Dashcard "${name}" created in list "${lists.find(l => l.id === targetListId)?.name || 'Selected List'}". (Simulated)`,
 					duration: 5,
-					display: 'info'
+					display: 'success'
 				});
-				t.closePopup();
-
+				// Close popup after a short delay to let user read message
+				setTimeout(() => {
+					t.closePopup();
+				}, 1500);
 			} catch (e) {
 				console.error("Creation Error", e);
-				t.alert({ message: "Error creating card. Check console." });
+				t.alert({ message: "Error simulation failed.", display: 'error' });
 			}
 		} else {
-			// Saving Changes (Edit Mode)
+			// --- EDIT MODE (Card Button) ---
+			// We have a card context. We save data.
 			try {
 				const config = { ...filters, name, background: bg };
-				await t.set('card', 'shared', 'dashFilter', config);
 
-				// Set Cover
+				// 1. Save Power-Up Data
+				await t.set('card', 'shared', 'dashFilter', config);
+				await t.set('card', 'shared', 'isDashCard', true);
+
+				// 2. Update Card Name
+				if (name) {
+					try {
+						await t.card('name', name);
+					} catch (e) {
+						console.warn("Could not set card name:", e);
+					}
+				}
+
+				// 3. Update Card Cover
 				try {
 					if (bg.type === 'color') {
-						await t.card('cover', { color: getTrelloColorName(bg.value) || 'blue', size: 'full' });
+						const colorName = getTrelloColorName(bg.value) || 'blue';
+						await t.card('cover', { color: colorName, size: 'full' });
 					} else if (bg.type === 'image') {
-						// For images, best practice is to attach it first, then make it cover.
-						// Or use url if supported. Let's try t.attach if it's a new image.
-						// However, simply setting 'cover' with url might work if Trello allows valid HTTP urls.
-						// If it fails, we catch it.
-						await t.card('cover', { url: bg.value, size: 'full' });
+						if (bg.value.startsWith('http')) {
+							await t.card('cover', { url: bg.value, size: 'full' });
+						} else {
+							// If not a valid URL (e.g. data URI), Trello might reject it for cover.
+							// We skip or user sees warning.
+						}
 					}
 				} catch (coverError) {
-					console.warn("Failed to set cover:", coverError);
-					// Improve: Try attaching if direct cover set fails?
-					// await t.attach({ url: bg.value });
+					console.warn("Could not set card cover. Trello may strictly validate URLs.", coverError);
 				}
 
-				// Set Name
-				try {
-					if (name) await t.card('name', name);
-				} catch (nameError) {
-					console.warn("Failed to set name:", nameError);
-				}
-
-				await t.set('card', 'shared', 'isDashCard', true);
 				t.closePopup();
 			} catch (saveError) {
 				console.error("Save Error", saveError);
-				t.alert({ message: "Failed to save settings. Please try again." });
+				t.alert({ message: "Failed to save settings. Please try again.", display: 'error' });
 			}
 		}
 	};
@@ -263,95 +237,109 @@ function PopupUI() {
 	return (
 		<div className="dashcard-popup">
 			<div className="popup-header">
-				<h3 style={{ margin: 0, fontSize: 16 }}>{creationMode ? "Create Dashcard" : "Configuration"}</h3>
-				<button className="btn btn-sm" style={{ background: 'transparent', color: '#9fadbc' }} onClick={() => t.closePopup()}>Cancel</button>
+				<h3>Dashcards — Track</h3>
+				<div style={{ cursor: 'pointer' }} onClick={() => t.closePopup()}>✕</div>
 			</div>
+
+			{/* Body */}
 			<div className="popup-body">
-				<div className="preview-section">
-					<div className="preview-card" style={{ backgroundColor: bg.type === 'color' ? bg.value : 'transparent', backgroundImage: bg.type === 'image' ? `url(${bg.value})` : 'none' }}>
-						{bg.type === 'image' && <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)', borderRadius: 8 }}></div>}
-						<div style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
+
+				{/* TOP SECTION: Preview & Basic Config */}
+				<div className="top-section">
+					{/* LEFT: Preview */}
+					<div className="preview-section">
+						<div className="preview-card" style={{
+							backgroundColor: bg.type === 'color' ? bg.value : '#0065ff',
+							backgroundImage: bg.type === 'image' ? `url(${bg.value})` : 'none'
+						}}>
 							<div className="preview-count">{previewCount}</div>
-							<div className="preview-label">{name}</div>
+							<div className="preview-label">{name || 'Dashcard'}</div>
+						</div>
+					</div>
+
+					{/* RIGHT: Name & Appearance */}
+					<div className="basic-config-section">
+						<div className="dark-input-group">
+							<label>NAME</label>
+							<input type="text" className="dark-input" placeholder="Dashcard" value={name} onChange={(e) => setName(e.target.value)} />
+						</div>
+
+						<div className="dark-input-group" style={{ position: 'relative' }}>
+							<label>APPEARANCE</label>
+							<div className="bg-button" onClick={() => setShowBgPicker(!showBgPicker)}>
+								Change background
+							</div>
+							{showBgPicker && (
+								<div className="bg-picker-grid">
+									{BACKGROUNDS.map((b, i) => (
+										<div key={i} className="bg-option" style={{
+											backgroundColor: b.type === 'color' ? b.value : '#ccc',
+											backgroundImage: b.type === 'image' ? `url(${b.value})` : 'none',
+											backgroundSize: 'cover'
+										}} onClick={() => { setBg(b); setShowBgPicker(false); }}></div>
+									))}
+								</div>
+							)}
 						</div>
 					</div>
 				</div>
-				<div className="form-section">
-					{creationMode && (
-						<div className="dark-input-group" style={{ border: '1px solid #579dff', padding: 12, borderRadius: 4, background: 'rgba(87, 157, 255, 0.1)' }}>
-							<label style={{ color: '#579dff' }}>ADD TO LIST</label>
-							<select className="dark-select" value={targetListId} onChange={(e) => setTargetListId(e.target.value)} style={{ borderColor: '#579dff' }}>
+
+				<div className="filter-section">
+
+					{/* Row 1: Board & List */}
+					<div className="dark-input-group">
+						<label>⚏ Board</label>
+						<select className="dark-select" disabled>
+							<option>any</option>
+						</select>
+					</div>
+
+					<div className="dark-input-group">
+						<label>⚏ List</label>
+						{creationMode ? (
+							<select className="dark-select" value={targetListId} onChange={(e) => setTargetListId(e.target.value)}>
 								{Array.isArray(lists) && lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
 							</select>
-						</div>
-					)}
-					<div className="dark-input-group">
-						<label>NAME</label>
-						<input type="text" className="dark-input" value={name} onChange={(e) => setName(e.target.value)} />
-					</div>
-					<div className="dark-input-group">
-						<label>APPEARANCE</label>
-						<button className="btn btn-sm" style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }} onClick={() => setShowBgPicker(!showBgPicker)}>
-							{bg.type === 'image' ? '🖼️ Image' : '🎨 Color'} - Change background
-						</button>
-						{showBgPicker && (
-							<div className="bg-picker-grid">
-								{BACKGROUNDS.map((b, i) => (
-									<div key={i} className={`bg-option ${bg.value === b.value ? 'active' : ''}`} style={{ backgroundColor: b.type === 'color' ? b.value : '#ccc', backgroundImage: b.type === 'image' ? `url(${b.value})` : 'none', backgroundSize: 'cover' }} onClick={() => { setBg(b); setShowBgPicker(false); }}></div>
-								))}
-							</div>
+						) : (
+							<select className="dark-select" value="any" disabled>
+								<option>any</option>
+							</select>
 						)}
 					</div>
-					<hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '24px 0' }} />
 
-					{/* Hide List Filter if in Creation Mode (it's redundant) */}
-					{!creationMode && (
-						<div className="filter-row">
-							<div className="filter-label">List</div>
-							<div className="filter-control">
-								<select className="dark-select" value={filters.listId} onChange={(e) => setFilters({ ...filters, listId: e.target.value })}>
-									<option value="any">any</option>
-									{Array.isArray(lists) && lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-								</select>
-							</div>
-						</div>
-					)}
-					<div className="filter-row">
-						<div className="filter-label">Assigned</div>
-						<div className="filter-control">
-							<select className="dark-select" value={filters.memberId} onChange={(e) => setFilters({ ...filters, memberId: e.target.value })}>
-								<option value="any">Select...</option>
-								<option value="me"> assigned to me </option>
-								{Array.isArray(members) && members.map(m => <option key={m.id} value={m.id}>{m.fullName}</option>)}
-							</select>
-						</div>
+					{/* Row 2: Assigned & Due */}
+					<div className="dark-input-group">
+						<label>👤 Assigned</label>
+						<select className="dark-select" value={filters.memberId} onChange={(e) => setFilters({ ...filters, memberId: e.target.value })}>
+							<option value="any">Any member</option>
+							<option value="me">Assigned to me</option>
+							{Array.isArray(members) && members.map(m => <option key={m.id} value={m.id}>{m.fullName}</option>)}
+						</select>
 					</div>
-					<div className="filter-row">
-						<div className="filter-label">Due</div>
-						<div className="filter-control">
-							<select className="dark-select" value={filters.due} onChange={(e) => setFilters({ ...filters, due: e.target.value })}>
-								<option value="any">Select...</option>
-								<option value="overdue">Overdue</option>
-								<option value="week">Due this week</option>
-							</select>
-						</div>
+
+					<div className="dark-input-group">
+						<label>clock Due</label>
+						<select className="dark-select" value={filters.due} onChange={(e) => setFilters({ ...filters, due: e.target.value })}>
+							<option value="any">Any time</option>
+							<option value="overdue">Overdue</option>
+							<option value="week">Due within a week</option>
+						</select>
 					</div>
-					<div className="filter-row">
-						<div className="filter-label">Labels</div>
-						<div className="filter-control">
-							<select className="dark-select" value={filters.labelId} onChange={(e) => setFilters({ ...filters, labelId: e.target.value })}>
-								<option value="any">Select...</option>
-								{Array.isArray(labels) && labels.map(l => (<option key={l.id} value={l.id}>{l.name ? l.name : l.color}</option>))}
-							</select>
-						</div>
-					</div>
-					<div style={{ marginTop: 12 }}>
-						<button className="btn btn-sm" style={{ background: 'transparent', color: '#9fadbc', border: '1px solid #344563' }}>+ More filters</button>
+
+					{/* Row 3: Labels */}
+					<div className="dark-input-group">
+						<label>P Labels</label>
+						<select className="dark-select" value={filters.labelId} onChange={(e) => setFilters({ ...filters, labelId: e.target.value })}>
+							<option value="any">select ⌄</option>
+							{Array.isArray(labels) && labels.map(l => <option key={l.id} value={l.id}>{l.name} ({l.color})</option>)}
+						</select>
 					</div>
 				</div>
+
 			</div>
+
 			<div className="popup-footer">
-				<button className="btn" style={{ color: '#9fadbc', background: 'transparent' }} onClick={() => t.closePopup()}>Cancel</button>
+				<button className="btn btn-secondary" onClick={() => t.closePopup()}>Cancel</button>
 				<button className="btn btn-primary" onClick={saveConfiguration}>Start tracking</button>
 			</div>
 		</div>
@@ -438,57 +426,207 @@ function DashboardUI() {
 	)
 }
 
-const isPopup = document.getElementById("trello-popup-root");
-const isDashboard = document.getElementById("trello-dashboard-root");
+// Card Back Section Component (Photo 2)
+function CardBackUI() {
+	const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe() : null;
+	const [count, setCount] = useState(0);
 
-if (typeof window !== "undefined" && window.TrelloPowerUp && window.TrelloPowerUp.initialize && !isPopup && !isDashboard) {
+	useEffect(() => {
+		if (!t) return;
+		// Mock fetch count
+		calculateMatchCount(t).then(res => {
+			// res.text is string e.g. "4 matches"
+			const num = parseInt(res.text) || 0;
+			setCount(num);
+		});
+	}, [t]);
+
+	const openExplorer = () => {
+		t.modal({
+			title: "Dashcard", // Full dashboard
+			url: `${DEPLOY_URL}/popup.html?mode=explorer`,
+			height: 800,
+			fullscreen: false // Large modal
+		});
+	};
+
+	return (
+		<div className="card-back-container">
+			<div className="cb-toggle-row">
+				<div className="cb-toggle"></div>
+				<div>Allow members who can view this card to explore</div>
+			</div>
+			{/* Label Row */}
+			<div className="cb-label-row">
+				<div className="cb-label-color"></div>
+				<div className="cb-label-text">Dashcard</div>
+			</div>
+			{/* Summary Row */}
+			<div className="cb-summary-bar">
+				<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+					<div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '50%', width: 16, height: 16, textAlign: 'center', fontSize: 10, lineHeight: '16px' }}>ℹ</div>
+					<div>Showing the first {count} of {count} matching cards</div>
+				</div>
+				<button className="cb-button" onClick={openExplorer}>Explore and edit</button>
+			</div>
+		</div>
+	);
+}
+
+// Explorer / Dashboard Component (Photo 3)
+function ExplorerUI() {
+	const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe() : null;
+	const [matches, setMatches] = useState([]);
+	const [cardName, setCardName] = useState("Dashcard");
+	const [bg, setBg] = useState({ type: 'color', value: '#0065ff' }); // Mock default
+
+	useEffect(() => {
+		if (!t) return;
+		// Load context
+		t.get('card', 'shared', 'dashFilter').then(filter => {
+			if (filter) {
+				setCardName(filter.name || "Dashcard");
+				if (filter.background) setBg(filter.background);
+			}
+		});
+
+		// Mock Data Load (using existing logic)
+		calculateMatchCount(t).then(() => {
+			// In a real app we would load full cards. Here we mock some rows.
+			setMatches([
+				{ id: 1, name: "Project Alpha Kickoff", board: "My Trello board", status: "Active", date: "6 DEC", list: "Doing" },
+				{ id: 2, name: "Design Review", board: "My Trello board", status: "Active", date: "7 DEC", list: "To Do" },
+				{ id: 3, name: "Client Meeting", board: "My Trello board", status: "Completed", date: "5 DEC", list: "Done" },
+				{ id: 4, name: "Deployed to Prod", board: "My Trello board", status: "Completed", date: "6 DEC", list: "Done" }
+			]);
+		});
+	}, [t]);
+
+	return (
+		<div className="explorer-container">
+			{/* Header */}
+			<div className="explorer-header">
+				<div className="explorer-preview-micro" style={{
+					backgroundColor: bg.type === 'color' ? bg.value : '#222',
+					backgroundImage: bg.type === 'image' ? `url(${bg.value})` : 'none'
+				}}>
+					<div className="count">{matches.length}</div>
+				</div>
+				<div className="explorer-info">
+					<h2 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 8px 0' }}>{cardName}</h2>
+					<div className="explorer-meta-row">
+						<span>⚏ Board</span> is one of <span className="meta-tag" style={{ background: '#a855f7' }}>My Trello board</span>
+					</div>
+					<div className="explorer-meta-row">
+						<span>⚏ List</span> is one of <span className="meta-tag">This Week</span>
+					</div>
+					<div className="explorer-actions">
+						<button className="btn btn-secondary" style={{ background: '#2c2e35' }} onClick={() => t.modal({ url: `${DEPLOY_URL}/popup.html`, height: 700 })}>✎ Edit filters</button>
+						<button className="btn btn-secondary" style={{ background: '#2c2e35' }}>Clone Dashcard</button>
+					</div>
+				</div>
+			</div>
+
+			{/* Tabs */}
+			<div className="explorer-tabs">
+				<div className="explorer-tab active">Table ({matches.length} cards)</div>
+				<div className="explorer-tab">Metrics (1)</div>
+				<div className="explorer-tab">History</div>
+				<div className="explorer-tab">Alerts</div>
+			</div>
+
+			{/* Content Table */}
+			<div className="explorer-content">
+				<div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+					<button className="btn btn-secondary" style={{ marginRight: 8 }}>Columns</button>
+					<button className="btn btn-secondary">Export</button>
+				</div>
+				<table className="data-table">
+					<thead>
+						<tr>
+							<th>Name</th>
+							<th>Board</th>
+							<th>Complete</th>
+							<th>Created</th>
+							<th>List</th>
+						</tr>
+					</thead>
+					<tbody>
+						{matches.map(m => (
+							<tr key={m.id}>
+								<td>{m.name}</td>
+								<td>{m.board}</td>
+								<td><span className="status-indicator" style={{ background: m.status === 'Completed' ? '#57d9a3' : '#AEB9C6' }}></span></td>
+								<td>{m.date}</td>
+								<td>{m.list}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	);
+}
+
+// Helper to detect context
+const isPopup = !!document.getElementById("trello-popup-root") || window.location.pathname.includes("popup.html");
+const isDashboard = !!document.getElementById("trello-dashboard-root") || window.location.pathname.includes("dashboard.html");
+const isSettings = !!document.getElementById("trello-settings-root") || window.location.pathname.includes("settings.html");
+const isModal = window.location.search.includes("mode=");
+const isConnector = !isPopup && !isDashboard && !isModal && !isSettings;
+
+// STRICTLY only initialize capabilities in the connector.
+if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 	window.TrelloPowerUp.initialize({
 		"card-buttons": function (t) {
 			return [{
 				icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
 				text: "Track with Dashcard",
 				callback: function (t) {
-					return t.modal({ title: "Dashcards — Track", url: `${DEPLOY_URL}/popup.html`, height: 700 });
+					return t.modal({ title: "Dashcard", url: `${DEPLOY_URL}/popup.html`, height: 700 });
 				},
 			}];
 		},
 		"card-badges": function (t) {
-			return t.get('card', 'shared', 'dashFilter').then(filter => {
-				if (!filter) return [];
-				return [{
-					dynamic: function () {
-						return calculateMatchCount(t).then(result => ({ title: 'Dashcard', text: result.text, color: 'light-gray', refresh: 10 }));
-					}
-				}];
-			});
+			return t.get('card', 'shared', 'dashFilter')
+				.then(filter => {
+					if (!filter) return [];
+					return [{
+						dynamic: function () {
+							return calculateMatchCount(t)
+								.then(result => ({ title: 'Dashcard', text: result.text, color: 'light-gray', refresh: 10 }))
+								.catch(() => ({ text: '?' }));
+						}
+					}];
+				})
+				.catch(() => []);
 		},
-		/* 
-		   NOTE: To enable the "Dashcard Matches" section on the back of cards:
-		   1. Go to https://trello.com/power-ups/admin
-		   2. Open your Power-Up -> Capabilities
-		   3. Enable "Card Back Section"
-		   4. Uncomment the code below.
-		*/
-		// "card-back-section": function (t) {
-		// 	return t.get('card', 'shared', 'isDashCard').then(isDash => {
-		// 		if (!isDash) return [];
-		// 		return {
-		// 			title: 'Dashcard Matches',
-		// 			icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
-		// 			content: { type: 'iframe', url: t.signUrl(`${DEPLOY_URL}/dashboard.html`), height: 400 }
-		// 		}
-		// 	});
-		// },
+		"card-back-section": function (t) {
+			return t.get('card', 'shared', 'isDashCard').then(isDash => {
+				if (isDash) {
+					return {
+						title: 'Dashcard',
+						icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
+						content: {
+							type: 'iframe',
+							url: t.signUrl(`${DEPLOY_URL}/popup.html?mode=card-back`),
+							height: 140
+						}
+					}
+				}
+				return [];
+			}).catch(() => []);
+		},
 		"board-buttons": function (t) {
 			return [{
 				icon: {
-					dark: "https://icon.icepanel.io/Technology/svg/Trello.svg", // Using generic icon for demo
+					dark: "https://icon.icepanel.io/Technology/svg/Trello.svg",
 					light: "https://icon.icepanel.io/Technology/svg/Trello.svg"
 				},
 				text: "Create Dashcard",
 				callback: function (t) {
 					return t.modal({
-						title: "Create Dashcard",
+						title: "Dashcard",
 						url: `${DEPLOY_URL}/popup.html?mode=create`,
 						height: 700
 					});
@@ -506,10 +644,43 @@ if (typeof window !== "undefined" && window.TrelloPowerUp && window.TrelloPowerU
 }
 
 function mount() {
+	if (isConnector) return;
+
+	// Re-check DOM elements inside mount ensuring they exist
 	const popupRoot = document.getElementById("trello-popup-root");
 	const dashboardRoot = document.getElementById("trello-dashboard-root");
-	if (popupRoot) { createRoot(popupRoot).render(<PopupUI />); }
-	else if (dashboardRoot) { createRoot(dashboardRoot).render(<DashboardUI />); }
+
+	// Check URL params for mode
+	const params = new URLSearchParams(window.location.search);
+	const mode = params.get('mode');
+
+	if (popupRoot || document.getElementById("root") || mode || window.location.href.includes("popup.html") || isSettings) {
+		const rootEl = popupRoot || document.getElementById("root") || document.body;
+
+		// Ensure we clear previous content if using body
+		if (rootEl === document.body) {
+			// Create a container if none exists
+			let container = document.getElementById('app-container');
+			if (!container) {
+				container = document.createElement('div');
+				container.id = 'app-container';
+				document.body.appendChild(container);
+			}
+		}
+
+		const target = document.getElementById('app-container') || rootEl;
+
+		if (mode === 'card-back') {
+			createRoot(target).render(<CardBackUI />);
+		} else if (mode === 'explorer') {
+			createRoot(target).render(<ExplorerUI />);
+		} else if (dashboardRoot) {
+			createRoot(dashboardRoot).render(<DashboardUI />);
+		} else {
+			// Default is PopupUI (Create/Edit)
+			createRoot(target).render(<PopupUI />);
+		}
+	}
 }
 
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', mount); } else { mount(); }
