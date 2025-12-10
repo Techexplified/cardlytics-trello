@@ -465,6 +465,7 @@ body.popup-window {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  /* Prevent body scroll */
 }
 
 .dashcard-popup {
@@ -473,16 +474,20 @@ body.popup-window {
   height: 100vh;
   background-color: #17181c;
   color: #fff;
+  overflow: hidden;
+  /* Prevent container scroll */
 }
 
 .popup-header {
-  padding: 16px 24px;
+  padding: 12px 24px;
   /* Reduced vertical padding */
   background-color: #1f2025;
   border-bottom: 1px solid #2c2e35;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
+  /* Keep header fixed height */
 }
 
 .popup-header h3 {
@@ -496,35 +501,39 @@ body.popup-window {
   flex: 1;
   display: flex;
   flex-direction: column;
-  /* Stack Top Section and Filters */
-  padding: 24px 32px;
-  gap: 24px;
-  overflow-y: auto;
+  padding: 20px 32px;
+  /* Slightly tighter padding */
+  gap: 16px;
+  /* Reduced gap */
+  overflow-y: hidden;
+  /* Stop main scroll, allowing sections to fit */
 }
 
 /* TOP SECTION: Preview + Basic Config */
 .top-section {
   display: flex;
-  gap: 32px;
+  gap: 24px;
   align-items: flex-start;
+  flex-shrink: 0;
 }
 
 .preview-section {
-  flex: 0 0 280px;
-  /* Slightly smaller preview */
+  flex: 0 0 260px;
+  /* Slightly smaller width */
 }
 
 .preview-card {
   width: 100%;
-  aspect-ratio: 16/10;
+  aspect-ratio: 16/9;
+  /* Standard card ratio */
   border-radius: 8px;
   background-color: #0065ff;
-  padding: 20px;
+  padding: 16px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   position: relative;
   background-size: cover;
   background-position: center;
@@ -532,23 +541,24 @@ body.popup-window {
 
 .preview-card::before {
   content: "Cards";
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
 }
 
 .preview-count {
-  font-size: 56px;
+  font-size: 48px;
+  /* Slightly smaller to fit better */
   font-weight: 700;
   color: #fff;
   text-align: center;
   line-height: 1;
-  margin: 16px 0;
+  margin: 8px 0;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .preview-label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #fff;
   white-space: nowrap;
@@ -560,6 +570,10 @@ body.popup-window {
 .basic-config-section {
   flex: 1;
   max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* Control internal spacing */
 }
 
 /* FILTER SECTION (Grid Layout) */
@@ -567,11 +581,14 @@ body.popup-window {
   display: grid;
   grid-template-columns: 1fr 1fr;
   /* 2 columns */
-  gap: 20px 32px;
-  /* Row Gap, Column Gap */
-  margin-top: 8px;
-  padding-top: 24px;
+  gap: 12px 24px;
+  /* Tighter gaps */
+  margin-top: 4px;
+  padding-top: 16px;
   border-top: 1px solid #2c2e35;
+  flex: 1;
+  /* Allow it to take remaining space if needed */
+  align-content: start;
 }
 
 .dark-input-group label,
@@ -584,7 +601,7 @@ body.popup-window {
   display: block;
 }
 
-.dark-input,
+input.dark-input,
 .dark-select {
   width: 100%;
   background-color: #22242a;
@@ -634,6 +651,7 @@ input.dark-input {
   width: 100%;
   /* Full width button */
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .bg-button:hover {

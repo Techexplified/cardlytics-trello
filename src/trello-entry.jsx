@@ -6,6 +6,13 @@ const TrelloPowerUp = window.TrelloPowerUp;
 const DEPLOY_URL = "https://localhost:4173";
 const APP_KEY = '0919ce48a7f8507be8f698a755ffeda';
 
+// Helper to detect context - Defined at top level for use in components
+const isPopup = typeof document !== 'undefined' && (!!document.getElementById("trello-popup-root") || window.location.pathname.includes("popup.html"));
+const isDashboard = typeof document !== 'undefined' && (!!document.getElementById("trello-dashboard-root") || window.location.pathname.includes("dashboard.html"));
+const isSettings = typeof document !== 'undefined' && (!!document.getElementById("trello-settings-root") || window.location.pathname.includes("settings.html"));
+const isModal = typeof window !== 'undefined' && window.location.search.includes("mode=");
+const isConnector = !isPopup && !isDashboard && !isModal && !isSettings;
+
 const BACKGROUNDS = [
 	{ type: 'color', value: '#0079bf', name: 'Blue' },
 	{ type: 'color', value: '#d29034', name: 'Orange' },
@@ -160,32 +167,40 @@ function PopupUI() {
 	const saveConfiguration = async () => {
 		if (!t) return;
 
+		// Helper to close window properly based on context
+		const closeWindow = () => {
+			if (isModal || creationMode || getUrlParam("mode") === "edit") {
+				try { t.closeModal(); } catch (e) { t.closePopup(); }
+			} else {
+				t.closePopup();
+			}
+		};
+
 		if (creationMode) {
 			// --- CREATION MODE (Board Button) ---
-			// We cannot access card context here. We simulate creation.
+			// Since we cannot create cards directly without user auth token in this demo,
+			// we simulate the experience and guide the user.
 			if (!targetListId) {
 				t.alert({ message: "Please select a destination list.", duration: 3, display: 'warning' });
 				return;
 			}
 
 			try {
-				// Simulated Creation
+				// In a real Power-Up with an API token, we would use t.post('/cards', ...).
+				// Here we show a success message.
 				t.alert({
-					message: `Dashcard "${name}" created in list "${lists.find(l => l.id === targetListId)?.name || 'Selected List'}". (Simulated)`,
+					message: `Dashcard "${name}" configuration ready! Create a card and click "Track" to apply.`,
 					duration: 5,
 					display: 'success'
 				});
-				// Close popup after a short delay to let user read message
 				setTimeout(() => {
-					t.closePopup();
-				}, 1500);
+					closeWindow();
+				}, 2000);
 			} catch (e) {
 				console.error("Creation Error", e);
-				t.alert({ message: "Error simulation failed.", display: 'error' });
 			}
 		} else {
 			// --- EDIT MODE (Card Button) ---
-			// We have a card context. We save data.
 			try {
 				const config = { ...filters, name, background: bg };
 
@@ -195,31 +210,38 @@ function PopupUI() {
 
 				// 2. Update Card Name
 				if (name) {
-					try {
+					// We don't want to overwrite the card name if it's the same, to avoid jitter
+					const currentCard = await t.card('name');
+					if (currentCard.name !== name) {
 						await t.card('name', name);
-					} catch (e) {
-						console.warn("Could not set card name:", e);
 					}
 				}
 
-				// 3. Update Card Cover
 				try {
 					if (bg.type === 'color') {
-						const colorName = getTrelloColorName(bg.value) || 'blue';
-						await t.card('cover', { color: colorName, size: 'full' });
+						const colorName = getTrelloColorName(bg.value); // returns 'blue', 'orange', etc.
+						if (colorName) {
+							await t.card('cover', {
+								color: colorName,
+								size: 'full',
+								brightness: 'dark' // Ensures white text/buttons on card
+							});
+						}
 					} else if (bg.type === 'image') {
 						if (bg.value.startsWith('http')) {
-							await t.card('cover', { url: bg.value, size: 'full' });
-						} else {
-							// If not a valid URL (e.g. data URI), Trello might reject it for cover.
-							// We skip or user sees warning.
+							await t.card('cover', {
+								url: bg.value,
+								size: 'full',
+								brightness: 'dark'
+							});
 						}
 					}
 				} catch (coverError) {
-					console.warn("Could not set card cover. Trello may strictly validate URLs.", coverError);
+					console.warn("Could not set card cover:", coverError);
+					// Fallback: Alert user if cover failed (e.g. permission issue)
 				}
 
-				t.closePopup();
+				closeWindow();
 			} catch (saveError) {
 				console.error("Save Error", saveError);
 				t.alert({ message: "Failed to save settings. Please try again.", display: 'error' });
@@ -236,12 +258,6 @@ function PopupUI() {
 
 	return (
 		<div className="dashcard-popup">
-			<div className="popup-header">
-				<h3>Dashcards — Track</h3>
-				<div style={{ cursor: 'pointer' }} onClick={() => t.closePopup()}>✕</div>
-			</div>
-
-			{/* Body */}
 			<div className="popup-body">
 
 				{/* TOP SECTION: Preview & Basic Config */}
@@ -259,7 +275,7 @@ function PopupUI() {
 
 					{/* RIGHT: Name & Appearance */}
 					<div className="basic-config-section">
-						<div className="dark-input-group">
+						<div className="dark-input-group" style={{ marginBottom: '10px' }}>
 							<label>NAME</label>
 							<input type="text" className="dark-input" placeholder="Dashcard" value={name} onChange={(e) => setName(e.target.value)} />
 						</div>
@@ -288,14 +304,14 @@ function PopupUI() {
 
 					{/* Row 1: Board & List */}
 					<div className="dark-input-group">
-						<label>⚏ Board</label>
+						<label>Board</label>
 						<select className="dark-select" disabled>
 							<option>any</option>
 						</select>
 					</div>
 
 					<div className="dark-input-group">
-						<label>⚏ List</label>
+						<label>List</label>
 						{creationMode ? (
 							<select className="dark-select" value={targetListId} onChange={(e) => setTargetListId(e.target.value)}>
 								{Array.isArray(lists) && lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -309,7 +325,7 @@ function PopupUI() {
 
 					{/* Row 2: Assigned & Due */}
 					<div className="dark-input-group">
-						<label>👤 Assigned</label>
+						<label>Assigned</label>
 						<select className="dark-select" value={filters.memberId} onChange={(e) => setFilters({ ...filters, memberId: e.target.value })}>
 							<option value="any">Any member</option>
 							<option value="me">Assigned to me</option>
@@ -328,9 +344,9 @@ function PopupUI() {
 
 					{/* Row 3: Labels */}
 					<div className="dark-input-group">
-						<label>P Labels</label>
+						<label>Labels</label>
 						<select className="dark-select" value={filters.labelId} onChange={(e) => setFilters({ ...filters, labelId: e.target.value })}>
-							<option value="any">select ⌄</option>
+							<option value="any">select</option>
 							{Array.isArray(labels) && labels.map(l => <option key={l.id} value={l.id}>{l.name} ({l.color})</option>)}
 						</select>
 					</div>
@@ -568,13 +584,6 @@ function ExplorerUI() {
 	);
 }
 
-// Helper to detect context
-const isPopup = !!document.getElementById("trello-popup-root") || window.location.pathname.includes("popup.html");
-const isDashboard = !!document.getElementById("trello-dashboard-root") || window.location.pathname.includes("dashboard.html");
-const isSettings = !!document.getElementById("trello-settings-root") || window.location.pathname.includes("settings.html");
-const isModal = window.location.search.includes("mode=");
-const isConnector = !isPopup && !isDashboard && !isModal && !isSettings;
-
 // STRICTLY only initialize capabilities in the connector.
 if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 	window.TrelloPowerUp.initialize({
@@ -583,7 +592,7 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 				icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
 				text: "Track with Dashcard",
 				callback: function (t) {
-					return t.modal({ title: "Dashcard", url: `${DEPLOY_URL}/popup.html`, height: 700 });
+					return t.modal({ title: "Dashcard", url: `${DEPLOY_URL}/popup.html?mode=edit`, height: 700 });
 				},
 			}];
 		},
