@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Authenticating...</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f4f5f7; color: #172b4d; }
+    </style>
+</head>
+<body>
+    <div style="text-align: center;">
+        <h3>Connecting to Trello...</h3>
+        <p>Please wait while we verify your account.</p>
+    </div>
+    <script>
+        // Extract token from URL hash (Trello implicit grant)
+        const hash = window.location.hash;
+        const tokenMatch = hash.match(/token=([0-9a-fA-F]{64})/);
+        // Also look for error
+        const errorMatch = hash.match(/error=([^&]*)/);
+
+        if (tokenMatch && window.opener) {
+            const token = tokenMatch[1];
+            // Send the token back to the opener (the Power-Up iframe)
+            // TargetOrigin "*" to ensure it reaches the Power-Up on arbitrary Trello domains/localhost
+            window.opener.postMessage(token, "*");
+            setTimeout(() => window.close(), 1000);
+        } else if (errorMatch) {
+             document.body.innerHTML = "<h3 style='color:red;'>Authorization Failed</h3><p>" + decodeURIComponent(errorMatch[1]) + "</p>";
+        } else {
+             // If manual navigation or no hash, close
+             // timeout to allow user to see it
+             // setTimeout(() => window.close(), 3000);
+        }
+    </script>
+</body>
+</html>
