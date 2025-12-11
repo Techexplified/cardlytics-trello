@@ -74,7 +74,7 @@ function getUrlParam(name) {
 }
 
 function PopupUI() {
-	const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe() : null;
+	const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'Dashcards' }) : null;
 	const [name, setName] = useState("Dashcard");
 	const [bg, setBg] = useState(BACKGROUNDS[0]);
 	const [showBgPicker, setShowBgPicker] = useState(false);
@@ -415,7 +415,7 @@ function PopupUI() {
 }
 
 function DashboardUI() {
-	const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe() : null;
+	const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'Dashcards' }) : null;
 	const [matches, setMatches] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [isDashContext, setIsDashContext] = useState(false);
