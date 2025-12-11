@@ -4,7 +4,7 @@ import "./styles.css";
 
 const TrelloPowerUp = window.TrelloPowerUp;
 const DEPLOY_URL = "https://localhost:4173";
-const APP_KEY = '0919ce48a7f8507be8f698a755ffeda';
+const APP_KEY = '0919ce148a7f8507be8f698a755ffeda';
 
 const isPopup = typeof document !== 'undefined' && (!!document.getElementById("trello-popup-root") || window.location.pathname.includes("popup.html"));
 const isDashboard = typeof document !== 'undefined' && (!!document.getElementById("trello-dashboard-root") || window.location.pathname.includes("dashboard.html"));
@@ -22,12 +22,7 @@ const BACKGROUNDS = [
 	{ type: 'color', value: 'sky', name: 'Sky', hex: '#00aecc' },
 	{ type: 'color', value: 'lime', name: 'Lime', hex: '#4bbf6b' },
 	{ type: 'color', value: 'yellow', name: 'Yellow', hex: '#f2d600' },
-	{ type: 'color', value: 'black', name: 'Black', hex: '#091e42' },
-	{ type: 'image', value: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1000&q=80', name: 'Business' },
-	{ type: 'image', value: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1000&q=80', name: 'Tech' },
-	{ type: 'image', value: 'https://images.unsplash.com/photo-1493934558415-9d19f0b2b4d2?auto=format&fit=crop&w=1000&q=80', name: 'Creative' },
-	{ type: 'image', value: 'https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=1000&q=80', name: 'Gradient' },
-	{ type: 'image', value: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80', name: 'Sea' },
+	{ type: 'color', value: 'black', name: 'Black', hex: '#091e42' }
 ];
 
 async function calculateMatchCount(t) {
@@ -183,83 +178,130 @@ function PopupUI() {
 			}
 		};
 
-		// FIX: The authorization gate must be the first step for write operations.
-		// It pauses execution until the user grants permission via the popup.
-		try {
-			await t.authorize({ scope: 'write', expiration: 'never' });
-		} catch (authError) {
-			// This catches if the user closes the auth popup or if Trello fails to show it.
-			t.alert({ message: "Write permissions required to save card settings (rename/cover).", duration: 5, display: 'error' });
-			return;
-		}
-
 		if (creationMode) {
+			// --- CREATE MODE ---
 			if (!targetListId) {
 				t.alert({ message: "Please select a destination list.", duration: 3, display: 'warning' });
 				return;
 			}
 
 			try {
-				await t.createCard(targetListId, {
+				let token = null;
+				// Try to get token for setting cover color
+				try {
+					const rest = t.getRestApi();
+					if (await rest.isAuthorized()) {
+						token = await rest.getToken();
+					} else {
+						// Optional: authorize if you want to enforce cover setting on create
+						// await rest.authorize({ scope: 'read,write', expiration: 'never' });
+						// token = await rest.getToken();
+					}
+				} catch (err) { /* ignore auth error, will just skip cover */ }
+
+				// 1. Create Card
+				const newCard = await t.createCard(targetListId, {
 					name: name || "Dashcard",
 					pos: 'top'
 				});
 
-				t.alert({
-					message: `Dashcard "${name}" created! Open it and click "Track" to set filters.`,
-					duration: 6,
-					display: 'success'
-				});
+				// 2. Set Cover Color (if token available)
+				if (token && newCard && newCard.id && bg.type === 'color') {
+					await fetch(`https://api.trello.com/1/cards/${newCard.id}?key=${APP_KEY}&token=${token}`, {
+						method: 'PUT',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							cover: {
+								color: bg.value,
+								brightness: 'dark',
+								size: 'full'
+							}
+						})
+					}).catch(console.warn);
+				}
+
+				t.alert({ message: `Dashcard "${name}" created!`, duration: 3, display: 'success' });
 				setTimeout(() => closeWindow(), 1000);
+
 			} catch (e) {
+				console.error("Creation Error:", e);
 				t.alert({ message: "Error creating card", display: 'error' });
 			}
 
 		} else {
-			// --- EDIT MODE (Card Button) ---
-			try {
-				// 1. Save Power-Up Data (This is a write operation)
+			// --- EDIT MODE ---
+			const executeUpdate = async () => {
+				// 1. Save Power-Up Data (Shared)
+				// This stores the private configuration for the Power-Up logic
 				const config = { ...filters, name, background: bg };
 				await t.set('card', 'shared', 'dashFilter', config);
 				await t.set('card', 'shared', 'isDashCard', true);
 
-				// 2. Update Card Name (This is a write operation)
-				if (name) {
-					await t.card('name', name).catch(e => console.warn("Rename failed", e));
-				}
-
-				// 3. Update Card Cover (This is a write operation)
-				const validTrelloColors = ['blue', 'orange', 'green', 'red', 'purple', 'pink', 'sky', 'lime', 'yellow', 'black'];
-
-				if (bg.type === 'color') {
-					let colorName = bg.value;
-					if (!validTrelloColors.includes(colorName)) {
-						const found = BACKGROUNDS.find(b => b.hex === colorName || b.value === colorName);
-						if (found && validTrelloColors.includes(found.value)) {
-							colorName = found.value;
-						} else {
-							colorName = 'blue';
-						}
+				// 2. Prepare for Visual Updates (Name & Cover) via REST API
+				// We use REST API because t.card() write operations often fail with "InvalidField" 
+				// or permission errors if the token scope isn't perfectly aligned in the client context.
+				let token = null;
+				try {
+					const rest = t.getRestApi();
+					if (await rest.isAuthorized()) {
+						token = await rest.getToken();
+					} else {
+						// We need write permissions to change the card name/cover
+						await rest.authorize({ scope: 'read,write', expiration: 'never' });
+						token = await rest.getToken();
 					}
-
-					await t.card('cover', {
-						color: colorName,
-						size: 'full',
-						brightness: 'dark'
-					});
-				} else if (bg.type === 'image' && bg.value.startsWith('http')) {
-					await t.card('cover', {
-						url: bg.value,
-						size: 'full',
-						brightness: 'dark'
-					});
+				} catch (authErr) {
+					console.warn("REST API auth failed, visual updates (name/cover) skipped:", authErr);
 				}
 
+				if (token) {
+					try {
+						const card = await t.card('id');
+						const cardId = card.id;
+
+						const updates = {};
+
+						// Update Name
+						if (name) {
+							updates.name = name;
+						}
+
+						// Update Cover
+						if (bg.type === 'color') {
+							const validTrelloColors = ['blue', 'orange', 'green', 'red', 'purple', 'pink', 'sky', 'lime', 'yellow', 'black'];
+							let colorName = bg.value;
+							if (!validTrelloColors.includes(colorName)) {
+								const found = BACKGROUNDS.find(b => b.hex === colorName || b.value === colorName);
+								colorName = found ? found.value : 'blue';
+							}
+							updates.cover = {
+								color: colorName,
+								brightness: 'dark',
+								size: 'full'
+							};
+						}
+
+						// Send Update Request
+						if (Object.keys(updates).length > 0) {
+							await fetch(`https://api.trello.com/1/cards/${cardId}?key=${APP_KEY}&token=${token}`, {
+								method: 'PUT',
+								headers: { 'Content-Type': 'application/json' },
+								body: JSON.stringify(updates)
+							});
+						}
+					} catch (apiErr) {
+						console.error("API Update failed:", apiErr);
+					}
+				}
+			};
+
+			try {
+				await executeUpdate();
 				t.alert({ message: "Dashcard updated!", duration: 2, display: 'success' });
 				setTimeout(closeWindow, 500);
-
-			} catch (saveError) {
-				t.alert({ message: "Failed to save settings. (Check console for API error)", display: 'error' });
+			} catch (err) {
+				console.error("Update failed", err);
+				t.alert({ message: "Update failed.", display: 'error' });
 			}
 		}
 	};
@@ -463,6 +505,8 @@ function DashboardUI() {
 
 if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 	window.TrelloPowerUp.initialize({
+		appKey: APP_KEY,
+		appName: 'Dashcards',
 		"card-buttons": function (t) {
 			return [{
 				icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
@@ -485,17 +529,6 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 					}];
 				})
 				.catch(() => []);
-		},
-		"card-back-section": function (t) {
-			return {
-				title: 'Dashcard Actions',
-				icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
-				content: {
-					type: 'iframe',
-					url: t.signUrl(`${DEPLOY_URL}/dashboard.html`),
-					height: 300
-				}
-			};
 		},
 
 		"board-buttons": function (t) {
