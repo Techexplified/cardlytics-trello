@@ -6,7 +6,6 @@ const TrelloPowerUp = window.TrelloPowerUp;
 const DEPLOY_URL = "https://localhost:4173";
 const APP_KEY = '0919ce48a7f8507be8f698a755ffeda';
 
-// Helper to detect context - Defined at top level for use in components
 const isPopup = typeof document !== 'undefined' && (!!document.getElementById("trello-popup-root") || window.location.pathname.includes("popup.html"));
 const isDashboard = typeof document !== 'undefined' && (!!document.getElementById("trello-dashboard-root") || window.location.pathname.includes("dashboard.html"));
 const isSettings = typeof document !== 'undefined' && (!!document.getElementById("trello-settings-root") || window.location.pathname.includes("settings.html"));
@@ -69,7 +68,6 @@ async function calculateMatchCount(t) {
 		const count = matchedCards.length;
 		return { text: count.toString(), color: null, count };
 	} catch (error) {
-		console.error("Error calculating match count:", error);
 		return { text: 'Err', count: 0 };
 	}
 }
@@ -83,7 +81,7 @@ function getUrlParam(name) {
 function PopupUI() {
 	const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe() : null;
 	const [name, setName] = useState("Dashcard");
-	const [bg, setBg] = useState(BACKGROUNDS[0]); // Default to first (Blue)
+	const [bg, setBg] = useState(BACKGROUNDS[0]);
 	const [showBgPicker, setShowBgPicker] = useState(false);
 	const [filters, setFilters] = useState({ listId: 'any', memberId: 'any', labelId: 'any', due: 'any' });
 	const [previewCount, setPreviewCount] = useState(0);
@@ -112,9 +110,7 @@ function PopupUI() {
 						setFilters(storedFilter);
 						if (storedFilter.name) setName(storedFilter.name);
 						if (storedFilter.background) {
-							// Ensure stored background matches current schema
 							const b = storedFilter.background;
-							// If it's a legacy hex string, try to match it
 							if (typeof b === 'string') {
 								const matched = BACKGROUNDS.find(x => x.hex === b || x.value === b);
 								setBg(matched || BACKGROUNDS[0]);
@@ -134,7 +130,6 @@ function PopupUI() {
 					setTargetListId(boardLists[0].id);
 				}
 			} catch (error) {
-				console.error("Failed to fetch data:", error);
 			} finally {
 				setLoading(false);
 			}
@@ -173,7 +168,6 @@ function PopupUI() {
 				});
 				setPreviewCount(matched.length);
 			} catch (e) {
-				console.error("Live preview error", e);
 			}
 		};
 		const debounce = setTimeout(calculateActiveCount, 500);
@@ -183,108 +177,93 @@ function PopupUI() {
 	const saveConfiguration = async () => {
 		if (!t) return;
 
-		// Helper to close window
 		const closeWindow = () => {
 			try { t.closeModal(); } catch (e) {
 				try { t.closePopup(); } catch (e2) { /* ignore */ }
 			}
 		};
 
+		// FIX: The authorization gate must be the first step for write operations.
+		// It pauses execution until the user grants permission via the popup.
+		try {
+			await t.authorize({ scope: 'write', expiration: 'never' });
+		} catch (authError) {
+			// This catches if the user closes the auth popup or if Trello fails to show it.
+			t.alert({ message: "Write permissions required to save card settings (rename/cover).", duration: 5, display: 'error' });
+			return;
+		}
+
 		if (creationMode) {
-			// --- CREATION MODE (Board Button) ---
 			if (!targetListId) {
 				t.alert({ message: "Please select a destination list.", duration: 3, display: 'warning' });
 				return;
 			}
 
-			// We need to create a new card first to apply settings
 			try {
-				const newCard = await t.createCard(targetListId, {
+				await t.createCard(targetListId, {
 					name: name || "Dashcard",
 					pos: 'top'
 				});
 
-				// Now try to set the context on that new card (Tricky from board button, usually we just alert user)
-				// Since we can't easily set context on a remote card from here without more scope,
-				// we'll guide the user.
-				// ACTUALLY: Basic Power-Ups can't easily write to *other* cards' pluginData from a board button context 
-				// without advanced scopes or storing in board shared data referencing the card.
-				// For this simplified version, we just create the card. The user has to click "Track" on it.
-				// BUT: The user expects it to work.
-				// Workaround: We can't automatically 'convert' the remote card from here easily.
 				t.alert({
-					message: `Dashcard "${name}" created! Open it and click "Track" to activate filters.`,
+					message: `Dashcard "${name}" created! Open it and click "Track" to set filters.`,
 					duration: 6,
 					display: 'success'
 				});
 				setTimeout(() => closeWindow(), 1000);
 			} catch (e) {
-				console.error("Creation Error", e);
 				t.alert({ message: "Error creating card", display: 'error' });
 			}
+
 		} else {
 			// --- EDIT MODE (Card Button) ---
 			try {
-				// 1. Save Power-Up Data
+				// 1. Save Power-Up Data (This is a write operation)
 				const config = { ...filters, name, background: bg };
 				await t.set('card', 'shared', 'dashFilter', config);
 				await t.set('card', 'shared', 'isDashCard', true);
 
-				// 2. Update Card Name
+				// 2. Update Card Name (This is a write operation)
 				if (name) {
-					// We are contextually on the card, so this works
 					await t.card('name', name).catch(e => console.warn("Rename failed", e));
 				}
 
-				// 3. Update Card Cover (STRICT TRELLO COLORS)
-				try {
-					const validTrelloColors = ['blue', 'orange', 'green', 'red', 'purple', 'pink', 'sky', 'lime', 'yellow', 'black'];
+				// 3. Update Card Cover (This is a write operation)
+				const validTrelloColors = ['blue', 'orange', 'green', 'red', 'purple', 'pink', 'sky', 'lime', 'yellow', 'black'];
 
-					if (bg.type === 'color') {
-						// Ensure we use the 'value' which should be the color name
-						let colorName = bg.value;
-
-						// Safety check: if by some legacy reason it's a hex, try to map it
-						if (!validTrelloColors.includes(colorName)) {
-							// Try to find by hex
-							const found = BACKGROUNDS.find(b => b.hex === colorName || b.value === colorName);
-							if (found && validTrelloColors.includes(found.value)) {
-								colorName = found.value;
-							} else {
-								colorName = 'blue'; // Fallback
-							}
-						}
-
-						await t.card('cover', {
-							color: colorName,
-							size: 'full',
-							brightness: 'dark' // Ensures white text title
-						});
-					} else if (bg.type === 'image') {
-						if (bg.value.startsWith('http')) {
-							await t.card('cover', {
-								url: bg.value,
-								size: 'full',
-								brightness: 'dark'
-							});
+				if (bg.type === 'color') {
+					let colorName = bg.value;
+					if (!validTrelloColors.includes(colorName)) {
+						const found = BACKGROUNDS.find(b => b.hex === colorName || b.value === colorName);
+						if (found && validTrelloColors.includes(found.value)) {
+							colorName = found.value;
+						} else {
+							colorName = 'blue';
 						}
 					}
-				} catch (coverError) {
-					console.warn("Could not set card cover:", coverError);
+
+					await t.card('cover', {
+						color: colorName,
+						size: 'full',
+						brightness: 'dark'
+					});
+				} else if (bg.type === 'image' && bg.value.startsWith('http')) {
+					await t.card('cover', {
+						url: bg.value,
+						size: 'full',
+						brightness: 'dark'
+					});
 				}
 
-				// Show success message
 				t.alert({ message: "Dashcard updated!", duration: 2, display: 'success' });
 				setTimeout(closeWindow, 500);
 
 			} catch (saveError) {
-				console.error("Save Error", saveError);
-				t.alert({ message: "Failed to save settings.", display: 'error' });
+				t.alert({ message: "Failed to save settings. (Check console for API error)", display: 'error' });
 			}
 		}
 	};
 
-	// Deprecated helper - logic is now direct
 	const getTrelloColorName = (hex) => {
 		const preset = BACKGROUNDS.find(b => b.hex === hex || b.value === hex);
 		return preset ? preset.value : 'blue';
@@ -296,9 +275,7 @@ function PopupUI() {
 		<div className="dashcard-popup">
 			<div className="popup-body">
 
-				{/* TOP SECTION: Preview & Basic Config */}
 				<div className="top-section">
-					{/* LEFT: Preview */}
 					<div className="preview-section">
 						<div className="preview-card" style={{
 							backgroundColor: bg.type === 'color' ? (bg.hex || '#0079bf') : '#0065ff',
@@ -309,7 +286,6 @@ function PopupUI() {
 						</div>
 					</div>
 
-					{/* RIGHT: Name & Appearance */}
 					<div className="basic-config-section">
 						<div className="dark-input-group" style={{ marginBottom: '10px' }}>
 							<label>NAME</label>
@@ -338,7 +314,6 @@ function PopupUI() {
 
 				<div className="filter-section">
 
-					{/* Row 1: Board & List */}
 					<div className="dark-input-group">
 						<label>Board</label>
 						<select className="dark-select" disabled>
@@ -353,13 +328,13 @@ function PopupUI() {
 								{Array.isArray(lists) && lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
 							</select>
 						) : (
-							<select className="dark-select" value="any" disabled>
-								<option>any</option>
+							<select className="dark-select" value={filters.listId} onChange={(e) => setFilters({ ...filters, listId: e.target.value })}>
+								<option value="any">Any list</option>
+								{Array.isArray(lists) && lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
 							</select>
 						)}
 					</div>
 
-					{/* Row 2: Assigned & Due */}
 					<div className="dark-input-group">
 						<label>Assigned</label>
 						<select className="dark-select" value={filters.memberId} onChange={(e) => setFilters({ ...filters, memberId: e.target.value })}>
@@ -378,11 +353,10 @@ function PopupUI() {
 						</select>
 					</div>
 
-					{/* Row 3: Labels */}
 					<div className="dark-input-group">
 						<label>Labels</label>
 						<select className="dark-select" value={filters.labelId} onChange={(e) => setFilters({ ...filters, labelId: e.target.value })}>
-							<option value="any">select</option>
+							<option value="any">Any label</option>
 							{Array.isArray(labels) && labels.map(l => <option key={l.id} value={l.id}>{l.name} ({l.color})</option>)}
 						</select>
 					</div>
@@ -403,6 +377,13 @@ function DashboardUI() {
 	const [matches, setMatches] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [isDashContext, setIsDashContext] = useState(false);
+
+	useEffect(() => {
+		if (isDashboard) {
+			document.body.style.backgroundColor = 'transparent';
+			document.documentElement.style.backgroundColor = 'transparent';
+		}
+	}, []);
 
 	useEffect(() => {
 		if (!t) return;
@@ -443,11 +424,10 @@ function DashboardUI() {
 						setMatches(filtered);
 					}
 				}
-			} catch (e) { console.log("Error", e); } finally { setLoading(false); }
+			} catch (e) { } finally { setLoading(false); }
 		};
 		fetchContext();
 
-		// Auto-resize
 		t.sizeTo('#trello-dashboard-root').catch(() => { });
 	}, [t]);
 
@@ -455,9 +435,9 @@ function DashboardUI() {
 
 	if (isDashContext) {
 		return (
-			<div style={{ padding: 12 }}>
+			<div style={{ padding: 12, backgroundColor: 'white' }}>
 				<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-					<h3 style={{ margin: 0 }}>Matched Cards ({matches.length})</h3>
+					<h3 style={{ margin: 0, color: '#172b4d' }}>Matched Cards ({matches.length})</h3>
 				</div>
 				{matches.length === 0 ? <div style={{ color: '#6b778c', fontStyle: 'italic' }}>No cards match.</div> : (
 					<div className="list-group">
@@ -481,11 +461,6 @@ function DashboardUI() {
 	)
 }
 
-
-
-
-
-// STRICTLY only initialize capabilities in the connector.
 if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 	window.TrelloPowerUp.initialize({
 		"card-buttons": function (t) {
@@ -552,20 +527,16 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 function mount() {
 	if (isConnector) return;
 
-	// Re-check DOM elements inside mount ensuring they exist
 	const popupRoot = document.getElementById("trello-popup-root");
 	const dashboardRoot = document.getElementById("trello-dashboard-root");
 
-	// Check URL params for mode
 	const params = new URLSearchParams(window.location.search);
 	const mode = params.get('mode');
 
 	if (popupRoot || document.getElementById("root") || mode || window.location.href.includes("popup.html") || isSettings) {
 		const rootEl = popupRoot || document.getElementById("root") || document.body;
 
-		// Ensure we clear previous content if using body
 		if (rootEl === document.body) {
-			// Create a container if none exists
 			let container = document.getElementById('app-container');
 			if (!container) {
 				container = document.createElement('div');
@@ -576,12 +547,9 @@ function mount() {
 
 		const target = document.getElementById('app-container') || rootEl;
 
-
-
 		if (dashboardRoot) {
 			createRoot(dashboardRoot).render(<DashboardUI />);
 		} else {
-			// Default is PopupUI (Create/Edit)
 			createRoot(target).render(<PopupUI />);
 		}
 	}

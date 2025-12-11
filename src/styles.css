@@ -238,11 +238,18 @@ input:focus {
 }
 
 /* --- Card Back Section Styles --- */
+/* FIX: Force Transparency for the Power-Up iframe body/html so Trello's native cover shows through */
+html,
+body.dashboard-window {
+  background-color: transparent !important;
+}
+
 .card-back-container {
   background-color: transparent;
   padding: 0;
-  color: #172b4d;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text-main);
+  /* Reset to Trello main text color for light theme content */
+  font-family: var(--font-family);
 }
 
 .cb-toggle-row {
@@ -297,12 +304,7 @@ input:focus {
 
 .cb-label-text {
   font-weight: 500;
-  color: #172b4d;
-  /* Trello defaults usually light in iframe? No, user screenshot is dark bg? 
-                     Currently Trello card back is white/gray. 
-                     Wait, user screenshot 2 shows dark back? 
-                     Let's assume PowerUp iframe background should be transparent or dark. 
-                     If dashboard is strictly dark theme, let's make this dark too. */
+  color: var(--text-main);
 }
 
 .cb-summary-bar {
@@ -461,33 +463,30 @@ input:focus {
 /* --- Dashcard Popup Styles (Hybrid Layout) --- */
 body.popup-window {
   background-color: transparent;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-family);
   margin: 0;
   padding: 0;
   overflow: hidden;
-  /* Prevent body scroll */
 }
 
 .dashcard-popup {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* Keep dark theme for popup/modal config */
   background-color: #17181c;
   color: #fff;
   overflow: hidden;
-  /* Prevent container scroll */
 }
 
 .popup-header {
   padding: 12px 24px;
-  /* Reduced vertical padding */
   background-color: #1f2025;
   border-bottom: 1px solid #2c2e35;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
-  /* Keep header fixed height */
 }
 
 .popup-header h3 {
@@ -502,11 +501,8 @@ body.popup-window {
   display: flex;
   flex-direction: column;
   padding: 20px 32px;
-  /* Slightly tighter padding */
   gap: 16px;
-  /* Reduced gap */
   overflow-y: hidden;
-  /* Stop main scroll, allowing sections to fit */
 }
 
 /* TOP SECTION: Preview + Basic Config */
@@ -519,13 +515,11 @@ body.popup-window {
 
 .preview-section {
   flex: 0 0 260px;
-  /* Slightly smaller width */
 }
 
 .preview-card {
   width: 100%;
   aspect-ratio: 16/9;
-  /* Standard card ratio */
   border-radius: 8px;
   background-color: #0065ff;
   padding: 16px;
@@ -533,7 +527,7 @@ body.popup-window {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
   position: relative;
   background-size: cover;
   background-position: center;
@@ -548,7 +542,6 @@ body.popup-window {
 
 .preview-count {
   font-size: 48px;
-  /* Slightly smaller to fit better */
   font-weight: 700;
   color: #fff;
   text-align: center;
@@ -573,21 +566,17 @@ body.popup-window {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* Control internal spacing */
 }
 
 /* FILTER SECTION (Grid Layout) */
 .filter-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  /* 2 columns */
   gap: 12px 24px;
-  /* Tighter gaps */
   margin-top: 4px;
   padding-top: 16px;
   border-top: 1px solid #2c2e35;
   flex: 1;
-  /* Allow it to take remaining space if needed */
   align-content: start;
 }
 
@@ -621,7 +610,6 @@ input.dark-input,
   background-position: right 8px center;
   background-size: 16px;
   padding-right: 32px;
-  /* Space for arrow */
 }
 
 /* Remove arrow for text input */
@@ -649,7 +637,6 @@ input.dark-input {
   cursor: pointer;
   font-weight: 500;
   width: 100%;
-  /* Full width button */
   justify-content: center;
   box-sizing: border-box;
 }
@@ -709,7 +696,6 @@ input.dark-input {
   border-radius: 4px;
   margin-top: 8px;
   position: absolute;
-  /* Float it */
   z-index: 100;
   width: 300px;
 }
@@ -727,7 +713,6 @@ input.dark-input {
 
 .more-filters-btn {
   grid-column: 1 / -1;
-  /* Span full row */
   color: #9fadbc;
   font-size: 13px;
   cursor: pointer;
