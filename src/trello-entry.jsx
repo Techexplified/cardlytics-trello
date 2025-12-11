@@ -53,16 +53,19 @@ async function calculateMatchCount(t) {
 		const allCards = await t.board('all').get('cards', 'all');
 		if (!Array.isArray(allCards)) return { text: '', color: null, count: 0 };
 
-		const me = await t.member('id');
+		const me = (await t.member('id')).id;
 		const now = new Date();
 
 		const matchedCards = allCards.filter(card => {
 			if (card.closed) return false;
+			if (criteria.cardId && card.id === criteria.cardId) return false;
 			if (criteria.listId && criteria.listId !== 'any' && card.idList !== criteria.listId) return false;
 			if (criteria.memberId && criteria.memberId !== 'any') {
-				if (criteria.memberId === 'me') {
-					if (!card.idMembers || !card.idMembers.includes(me)) return false;
-				} else if (!card.idMembers || !card.idMembers.includes(criteria.memberId)) return false;
+				// Normalize 'me' to the current user's ID
+				const targetMemberId = (criteria.memberId === 'me') ? me : criteria.memberId;
+
+				if (!card.idMembers || !Array.isArray(card.idMembers)) return false;
+				if (!card.idMembers.includes(targetMemberId)) return false;
 			}
 			if (criteria.labelId && criteria.labelId !== 'any' && (!card.idLabels || !card.idLabels.includes(criteria.labelId))) return false;
 			if (criteria.due && criteria.due !== 'any') {
@@ -215,10 +218,11 @@ function PopupUI() {
 				const allCards = await t.board('all').get('cards', 'all');
 				if (!Array.isArray(allCards)) return;
 
-				const me = await t.member('id');
+				const me = (await t.member('id')).id;
 				const now = new Date();
 				const matched = allCards.filter(card => {
 					if (card.closed) return false;
+					if (filters.cardId && card.id === filters.cardId) return false;
 					if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
 					if (filters.memberId && filters.memberId !== 'any') {
 						if (filters.memberId === 'me') {
@@ -254,10 +258,8 @@ function PopupUI() {
 			}
 		};
 
-		// Helper to generate cover image URL
 		const getCoverUrl = (hexColor, count) => {
 			const cleanHex = hexColor.replace('#', '');
-			// Using placehold.co to generate a solid color image with the number
 			return `https://placehold.co/600x400/${cleanHex}/ffffff.png?text=${count}`;
 		};
 
@@ -270,52 +272,55 @@ function PopupUI() {
 
 			try {
 				let token = null;
-				// Try to get token for setting cover color
 				try {
 					const rest = t.getRestApi();
 					if (await rest.isAuthorized()) {
 						token = await rest.getToken();
-					} else {
-						// Optional: authorize if you want to enforce cover setting on create
-						// await rest.authorize({ scope: 'read,write', expiration: 'never' });
-						// token = await rest.getToken();
 					}
-				} catch (err) { /* ignore auth error, will just skip cover */ }
+				} catch (err) { /* ignore */ }
 
-				// 1. Create the Card with Config in Description
-				// We store config in DESC because we cannot t.set() on a newly created card from board context.
-				const config = { ...filters, name, background: bg, listId: targetListId }; // Ensure listId is set to target
-				const descPayload = `DASHCARD_CONFIG|${JSON.stringify(config)}`;
-
+				// 1. Create the Dashcard
 				const newCard = await t.createCard(targetListId, {
 					name: name || "Dashcard",
-					desc: descPayload,
-					pos: 'top'
+					desc: "Temporary config holder",
+					pos: "top"
 				});
 
-				// 2. Set Custom Cover (Image with Count)
-				if (token && newCard && newCard.id && bg.type === 'color') {
-					const imageUrl = getCoverUrl(bg.hex || '#0079bf', previewCount);
+				// IMPORTANT: ensure Dashcard does NOT count itself
+				filters.cardId = newCard.id;
 
-					// A) Upload Attachment
-					const attachUrl = `https://api.trello.com/1/cards/${newCard.id}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`;
-					const attachRes = await fetch(attachUrl, { method: 'POST' });
+				// 2. Save full config now that we have the cardId
+				const config = { ...filters, name, background: bg, listId: targetListId, cardId: newCard.id };
+				const descPayload = `DASHCARD_CONFIG|${JSON.stringify(config)}`;
+
+				await fetch(`https://api.trello.com/1/cards/${newCard.id}?key=${APP_KEY}&token=${token || ""}`, {
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ desc: descPayload })
+				});
+
+				// 3. Set visual cover
+				if (token && bg.type === 'color') {
+					const imageUrl = getCoverUrl(bg.hex || "#0079bf", previewCount);
+
+					// Upload attachment
+					const attachRes = await fetch(
+						`https://api.trello.com/1/cards/${newCard.id}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`,
+						{ method: "POST" }
+					);
 
 					if (attachRes.ok) {
 						const attachData = await attachRes.json();
-						const attachmentId = attachData.id;
 
-						// B) Set Attachment as Cover
 						await fetch(`https://api.trello.com/1/cards/${newCard.id}?key=${APP_KEY}&token=${token}`, {
-							method: 'PUT',
-							headers: { 'Content-Type': 'application/json' },
+							method: "PUT",
+							headers: { "Content-Type": "application/json" },
 							body: JSON.stringify({
 								cover: {
-									idAttachment: attachmentId,
+									idAttachment: attachData.id,
 									color: null,
-									idUploadedBackground: null,
-									size: 'full',
-									brightness: 'dark'
+									size: "full",
+									brightness: "dark"
 								}
 							})
 						});
@@ -323,7 +328,7 @@ function PopupUI() {
 				}
 
 				t.alert({ message: `Dashcard "${name}" created!`, duration: 3, display: 'success' });
-				setTimeout(() => closeWindow(), 1000);
+				setTimeout(closeWindow, 1000);
 
 			} catch (e) {
 				console.error("Creation Error:", e);
@@ -333,65 +338,63 @@ function PopupUI() {
 		} else {
 			// --- EDIT MODE ---
 			const executeUpdate = async () => {
-				// 1. Save Power-Up Data (Shared)
-				// This stores the private configuration for the Power-Up logic
-				const config = { ...filters, name, background: bg };
+
+				const card = await t.card('id');
+
+				// IMPORTANT: ensure Dashcard does NOT count itself AFTER an edit
+				filters.cardId = card.id;
+
+				const config = { ...filters, name, background: bg, cardId: card.id };
 				await t.set('card', 'shared', 'dashFilter', config);
 				await t.set('card', 'shared', 'isDashCard', true);
 
-				// 2. Prepare for Visual Updates (Name & Cover) via REST API
-				// We use REST API because t.card() write operations often fail with "InvalidField" 
-				// or permission errors if the token scope isn't perfectly aligned in the client context.
 				let token = null;
 				try {
 					const rest = t.getRestApi();
 					if (await rest.isAuthorized()) {
 						token = await rest.getToken();
 					} else {
-						// We need write permissions to change the card name/cover
 						await rest.authorize({ scope: 'read,write', expiration: 'never' });
 						token = await rest.getToken();
 					}
 				} catch (authErr) {
-					console.warn("REST API auth failed, visual updates (name/cover) skipped:", authErr);
+					console.warn("REST API auth failed:", authErr);
 				}
 
 				if (token) {
 					try {
-						const card = await t.card('id');
 						const cardId = card.id;
 
-						// Update Name
+						// Update name
 						if (name) {
 							await fetch(`https://api.trello.com/1/cards/${cardId}?key=${APP_KEY}&token=${token}`, {
-								method: 'PUT',
-								headers: { 'Content-Type': 'application/json' },
-								body: JSON.stringify({ name: name })
+								method: "PUT",
+								headers: { "Content-Type": "application/json" },
+								body: JSON.stringify({ name })
 							});
 						}
 
-						// Update Cover (Image Attachment)
+						// Update cover
 						if (bg.type === 'color') {
-							const imageUrl = getCoverUrl(bg.hex || '#0079bf', previewCount);
+							const imageUrl = getCoverUrl(bg.hex || "#0079bf", previewCount);
 
-							// A) Upload Attachment
-							const attachUrl = `https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`;
-							const attachRes = await fetch(attachUrl, { method: 'POST' });
+							const attachRes = await fetch(
+								`https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`,
+								{ method: "POST" }
+							);
 
 							if (attachRes.ok) {
 								const attachData = await attachRes.json();
-								const attachmentId = attachData.id;
 
-								// B) Set Attachment as Cover
 								await fetch(`https://api.trello.com/1/cards/${cardId}?key=${APP_KEY}&token=${token}`, {
-									method: 'PUT',
-									headers: { 'Content-Type': 'application/json' },
+									method: "PUT",
+									headers: { "Content-Type": "application/json" },
 									body: JSON.stringify({
 										cover: {
-											idAttachment: attachmentId,
+											idAttachment: attachData.id,
 											color: null,
-											size: 'full',
-											brightness: 'dark'
+											size: "full",
+											brightness: "dark"
 										}
 									})
 								});
@@ -413,6 +416,7 @@ function PopupUI() {
 			}
 		}
 	};
+
 
 	const getTrelloColorName = (hex) => {
 		const preset = BACKGROUNDS.find(b => b.hex === hex || b.value === hex);
@@ -549,10 +553,11 @@ function DashboardUI() {
 							setMatches([]); setLoading(false); return;
 						}
 
-						const me = await t.member('id');
+						const me = (await t.member('id')).id;
 						const now = new Date();
 						const filtered = allCards.filter(card => {
 							if (card.closed) return false;
+							if (filter.cardId && card.id === filter.cardId) return false;
 							if (filter.listId && filter.listId !== 'any' && card.idList !== filter.listId) return false;
 							if (filter.memberId && filter.memberId !== 'any') {
 								if (filter.memberId === 'me') {
