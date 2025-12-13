@@ -79,16 +79,13 @@ export default function PopupUI() {
                 const allCards = await t.board('all').get('cards', 'all');
                 if (!Array.isArray(allCards)) return;
 
-                const me = (await t.member('id')).id;
                 const now = new Date();
                 const matched = allCards.filter(card => {
                     if (card.closed) return false;
                     if (filters.cardId && card.id === filters.cardId) return false;
                     if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
                     if (filters.memberId && filters.memberId !== 'any') {
-                        if (filters.memberId === 'me') {
-                            if (!card.idMembers || !card.idMembers.includes(me)) return false;
-                        } else if (!card.idMembers || !card.idMembers.includes(filters.memberId)) return false;
+                        if (!card.idMembers?.includes(filters.memberId)) return false;
                     }
                     if (filters.labelId && filters.labelId !== 'any' && (!card.idLabels || !card.idLabels.includes(filters.labelId))) return false;
                     if (filters.due && filters.due !== 'any') {
@@ -147,11 +144,17 @@ export default function PopupUI() {
                     pos: "top"
                 });
 
-                // IMPORTANT: ensure Dashcard does NOT count itself
-                filters.cardId = newCard.id;
+                const updatedFilters = { ...filters, cardId: newCard.id };
+                setFilters(updatedFilters);
 
-                // 2. Save full config now that we have the cardId
-                const config = { ...filters, name, background: bg, listId: targetListId, cardId: newCard.id };
+                const config = {
+                    ...updatedFilters,
+                    name,
+                    background: bg,
+                    listId: targetListId,
+                    cardId: newCard.id
+                };
+
                 const descPayload = `DASHCARD_CONFIG|${JSON.stringify(config)}`;
 
                 await fetch(`https://api.trello.com/1/cards/${newCard.id}?key=${APP_KEY}&token=${token || ""}`, {
@@ -202,10 +205,16 @@ export default function PopupUI() {
 
                 const card = await t.card('id');
 
-                // IMPORTANT: ensure Dashcard does NOT count itself AFTER an edit
-                filters.cardId = card.id;
+                const updatedFilters = { ...filters, cardId: card.id };
+                setFilters(updatedFilters);
 
-                const config = { ...filters, name, background: bg, cardId: card.id };
+                const config = {
+                    ...updatedFilters,
+                    name,
+                    background: bg,
+                    cardId: card.id
+                };
+
                 await t.set('card', 'shared', 'dashFilter', config);
                 await t.set('card', 'shared', 'isDashCard', true);
 
@@ -352,10 +361,20 @@ export default function PopupUI() {
 
                     <div className="dark-input-group">
                         <label>Assigned</label>
-                        <select className="dark-select" value={filters.memberId} onChange={(e) => setFilters({ ...filters, memberId: e.target.value })}>
+                        <select
+                            className="dark-select"
+                            value={filters.memberId}
+                            onChange={(e) =>
+                                setFilters({ ...filters, memberId: e.target.value })
+                            }
+                        >
                             <option value="any">Any member</option>
-                            <option value="me">Assigned to me</option>
-                            {Array.isArray(members) && members.map(m => <option key={m.id} value={m.id}>{m.fullName}</option>)}
+
+                            {members.map((m) => (
+                                <option key={m.id} value={m.id}>
+                                    Assigned to {m.fullName}
+                                </option>
+                            ))}
                         </select>
                     </div>
 
