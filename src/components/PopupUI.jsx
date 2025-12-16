@@ -7,10 +7,10 @@ export default function PopupUI() {
     const [name, setName] = useState("Dashcard");
     const [bg, setBg] = useState(BACKGROUNDS[0]);
     const [showBgPicker, setShowBgPicker] = useState(false);
-    // Setting up a clean, full default filter state including all keys
     const DEFAULT_FILTERS = { listId: 'any', memberId: 'any', labelId: 'any' };
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [previewCount, setPreviewCount] = useState(0);
+    const [matchedCards, setMatchedCards] = useState([]);
     const [lists, setLists] = useState([]);
     const [labels, setLabels] = useState({});
     const [members, setMembers] = useState({});
@@ -61,11 +61,7 @@ export default function PopupUI() {
                     }
 
                     if (storedFilter) {
-                        // Ensure saved filter is merged with current defaults to prevent missing keys
-                        const cleanedFilter = { ...DEFAULT_FILTERS, ...storedFilter };
-                        // Remove the 'due' key if it was saved previously
-                        delete cleanedFilter.due;
-
+                        const cleanedFilter = (({ due, ...rest }) => rest)(storedFilter);
                         setFilters(cleanedFilter);
 
                         if (storedFilter.name) setName(storedFilter.name);
@@ -80,8 +76,6 @@ export default function PopupUI() {
                             }
                         }
                     } else {
-                        // Ensure setFilters is explicitly called even if no storedFilter exists 
-                        // This ensures the dependency array of the calculation useEffect is always triggered
                         setFilters(DEFAULT_FILTERS);
                     }
                 }
@@ -100,13 +94,13 @@ export default function PopupUI() {
 
     useEffect(() => {
         if (!t) return;
-        console.log("here inside useEffect");
+        // console.log("here inside useEffect"); Removed
         const calculateActiveCount = async () => {
-            console.log("here inside calculateActiveCount");
+            // console.log("here inside calculateActiveCount"); Removed
             try {
                 const allCards = await t.cards('all');
 
-                console.log("The value of allCards is here", allCards);
+                // console.log("The value of allCards is here", allCards); Removed for final code
                 if (!Array.isArray(allCards)) return;
 
                 const matched = allCards.filter(card => {
@@ -116,13 +110,13 @@ export default function PopupUI() {
 
                     if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
 
-                    // FIX FOR MEMBER FILTERING: Use card.members and map to IDs
+                    // Member Filter: Use card.members and map to IDs
                     if (filters.memberId && filters.memberId !== 'any') {
                         const memberIds = Array.isArray(card.members) ? card.members.map(m => m.id) : [];
                         if (!memberIds.includes(filters.memberId)) return false;
                     }
 
-                    // FIX FOR LABEL FILTERING: Use card.labels and map to IDs
+                    // Label Filter: Use card.labels and map to IDs
                     if (filters.labelId && filters.labelId !== 'any') {
                         const labelIds = Array.isArray(card.labels) ? card.labels.map(l => l.id) : [];
                         if (!labelIds.includes(filters.labelId)) return false;
@@ -131,8 +125,9 @@ export default function PopupUI() {
                     return true;
                 });
 
-                console.log("The value of matched is here", matched);
+                // console.log("The value of matched is here", matched); Removed for final code
                 setPreviewCount(matched.length);
+                setMatchedCards(matched);
             } catch (e) {
                 console.error("Error calculating active count:", e);
             }
@@ -253,6 +248,8 @@ export default function PopupUI() {
                 await t.set('card', 'shared', 'dashFilter', config);
                 await t.set('card', 'shared', 'isDashCard', true);
 
+                t.render();
+
                 let token = null;
                 try {
                     const rest = t.getRestApi();
@@ -327,6 +324,12 @@ export default function PopupUI() {
         const preset = BACKGROUNDS.find(b => b.hex === hex || b.value === hex);
         return preset ? preset.value : 'blue';
     };
+
+    const getMemberName = (id) => {
+        const memberArray = Array.isArray(members) ? members : Object.values(members);
+        const member = memberArray.find(m => m.id === id);
+        return member ? member.fullName : 'Unknown Member';
+    }
 
     if (!t || loading) return <div className="loading-state" style={{ color: 'white' }}>Loading options...</div>;
 
@@ -420,6 +423,33 @@ export default function PopupUI() {
                             {Array.isArray(labels) && labels.map(l => <option key={l.id} value={l.id}>{l.name} ({l.color})</option>)}
                         </select>
                     </div>
+                </div>
+
+                <div className="matched-cards-section" style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
+                    <h4 style={{ color: 'white', marginBottom: '10px' }}>Matched Cards ({matchedCards.length})</h4>
+                    <ul style={{ listStyle: 'none', padding: 0, maxHeight: '150px', overflowY: 'auto' }}>
+                        {matchedCards.length > 0 ? (
+                            matchedCards.map(card => (
+                                <li key={card.id} style={{
+                                    backgroundColor: '#282c34',
+                                    padding: '8px',
+                                    marginBottom: '5px',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    color: '#ccc'
+                                }}>
+                                    <strong>{card.name}</strong>
+                                    {card.members && card.members.length > 0 &&
+                                        <span style={{ marginLeft: '10px', color: '#0079bf' }}>
+                                            (Assigned to: {card.members.map(m => m.fullName || m.id).join(', ')})
+                                        </span>
+                                    }
+                                </li>
+                            ))
+                        ) : (
+                            <li style={{ color: '#999', fontSize: '12px' }}>No cards matched the current filters.</li>
+                        )}
+                    </ul>
                 </div>
 
             </div>

@@ -28,6 +28,25 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 				},
 			}];
 		},
+
+		// FIX 1: Add the card-details capability to display content in the card back
+		"card-details": function (t) {
+			return t.get('card', 'shared', 'dashFilter')
+				.then(filter => {
+					// Only show the card detail section if the dashFilter exists
+					if (!filter) return [];
+
+					return [{
+						title: 'Dashcard Settings',
+						icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
+						// Use the same component/page as the popup for consistency
+						url: `${DEPLOY_URL}/popup.html?mode=edit`,
+						height: 700,
+					}];
+				})
+				.catch(() => []);
+		},
+
 		"card-badges": function (t) {
 			return t.get('card', 'shared', 'dashFilter')
 				.then(filter => {
