@@ -10,8 +10,8 @@ export default function PopupUI() {
     const [filters, setFilters] = useState({ listId: 'any', memberId: 'any', labelId: 'any', due: 'any' });
     const [previewCount, setPreviewCount] = useState(0);
     const [lists, setLists] = useState([]);
-    const [labels, setLabels] = useState([]);
-    const [members, setMembers] = useState([]);
+    const [labels, setLabels] = useState({});
+    const [members, setMembers] = useState({});
     const [loading, setLoading] = useState(true);
 
     const creationMode = getUrlParam("mode") === "create";
@@ -28,17 +28,33 @@ export default function PopupUI() {
                     t.board('members')
                 ]);
 
+                setLists(boardLists);
+                if (boardLabels && Array.isArray(boardLabels.Labels)) {
+                    setLabels(boardLabels.Labels);
+                } else if (boardLabels && Array.isArray(boardLabels.labels)) {
+                    setLabels(boardLabels.labels);
+                } else {
+                    setLabels(boardLabels);
+                }
+
+                if (boardMembers && boardMembers.members) {
+                    setMembers(boardMembers.members);
+                } else {
+                    setMembers(boardMembers);
+                }
+
                 if (!creationMode) {
                     let storedFilter = await t.get('card', 'shared', 'dashFilter');
 
-                    // Fallback: Check description if not in shared data
                     if (!storedFilter) {
                         try {
                             const c = await t.card('desc');
                             if (c && c.desc && c.desc.startsWith('DASHCARD_CONFIG|')) {
                                 storedFilter = JSON.parse(c.desc.replace('DASHCARD_CONFIG|', ''));
                             }
-                        } catch (e) { }
+                        } catch (e) {
+                            console.log(e);
+                        }
                     }
 
                     if (storedFilter) {
@@ -57,10 +73,6 @@ export default function PopupUI() {
                     }
                 }
 
-                setLists(boardLists || []);
-                setLabels(boardLabels || []);
-                setMembers(boardMembers || []);
-
                 if (creationMode && boardLists && boardLists.length > 0) {
                     setTargetListId(boardLists[0].id);
                 }
@@ -72,33 +84,31 @@ export default function PopupUI() {
         init();
     }, [t, creationMode]);
 
+
     useEffect(() => {
-        if (!t || loading) return;
+        if (!t) return;
+        console.log("here inside useEffect");
         const calculateActiveCount = async () => {
+            console.log("here inside calculateActiveCount");
             try {
-                const allCards = await t.board('all').get('cards', 'all');
+                const allCards = await t.cards('all');
+                console.log("The value of allCards is here", allCards);
                 if (!Array.isArray(allCards)) return;
 
-                const now = new Date();
                 const matched = allCards.filter(card => {
                     if (card.closed) return false;
                     if (filters.cardId && card.id === filters.cardId) return false;
                     if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
+
                     if (filters.memberId && filters.memberId !== 'any') {
                         if (!card.idMembers?.includes(filters.memberId)) return false;
                     }
                     if (filters.labelId && filters.labelId !== 'any' && (!card.idLabels || !card.idLabels.includes(filters.labelId))) return false;
-                    if (filters.due && filters.due !== 'any') {
-                        if (!card.due) return false;
-                        const d = new Date(card.due);
-                        if (filters.due === 'overdue' && (d >= now || card.dueComplete)) return false;
-                        if (filters.due === 'week') {
-                            const next = new Date(); next.setDate(now.getDate() + 7);
-                            if (d < now || d > next || card.dueComplete) return false;
-                        }
-                    }
+
+
                     return true;
                 });
+                console.log("The value of matched is here", matched);
                 setPreviewCount(matched.length);
             } catch (e) {
             }
@@ -106,6 +116,7 @@ export default function PopupUI() {
         const debounce = setTimeout(calculateActiveCount, 500);
         return () => clearTimeout(debounce);
     }, [filters, lists, loading, t]);
+
 
     const saveConfiguration = async () => {
         if (!t) return;
@@ -370,7 +381,7 @@ export default function PopupUI() {
                         >
                             <option value="any">Any member</option>
 
-                            {members.map((m) => (
+                            {Array.isArray(members) && members.map((m) => (
                                 <option key={m.id} value={m.id}>
                                     Assigned to {m.fullName}
                                 </option>
@@ -378,14 +389,16 @@ export default function PopupUI() {
                         </select>
                     </div>
 
-                    <div className="dark-input-group">
+                    {/* DUE DATE SELECT REMOVED as requested */}
+                    {/* <div className="dark-input-group">
                         <label>clock Due</label>
                         <select className="dark-select" value={filters.due} onChange={(e) => setFilters({ ...filters, due: e.target.value })}>
                             <option value="any">Any time</option>
                             <option value="overdue">Overdue</option>
                             <option value="week">Due within a week</option>
                         </select>
-                    </div>
+                    </div> 
+                    */}
 
                     <div className="dark-input-group">
                         <label>Labels</label>
