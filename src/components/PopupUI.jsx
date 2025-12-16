@@ -7,7 +7,9 @@ export default function PopupUI() {
     const [name, setName] = useState("Dashcard");
     const [bg, setBg] = useState(BACKGROUNDS[0]);
     const [showBgPicker, setShowBgPicker] = useState(false);
-    const [filters, setFilters] = useState({ listId: 'any', memberId: 'any', labelId: 'any', due: 'any' });
+    // Setting up a clean, full default filter state including all keys
+    const DEFAULT_FILTERS = { listId: 'any', memberId: 'any', labelId: 'any' };
+    const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [previewCount, setPreviewCount] = useState(0);
     const [lists, setLists] = useState([]);
     const [labels, setLabels] = useState({});
@@ -29,6 +31,7 @@ export default function PopupUI() {
                 ]);
 
                 setLists(boardLists);
+
                 if (boardLabels && Array.isArray(boardLabels.Labels)) {
                     setLabels(boardLabels.Labels);
                 } else if (boardLabels && Array.isArray(boardLabels.labels)) {
@@ -53,12 +56,18 @@ export default function PopupUI() {
                                 storedFilter = JSON.parse(c.desc.replace('DASHCARD_CONFIG|', ''));
                             }
                         } catch (e) {
-                            console.log(e);
+                            // console.log(e); Removed
                         }
                     }
 
                     if (storedFilter) {
-                        setFilters(storedFilter);
+                        // Ensure saved filter is merged with current defaults to prevent missing keys
+                        const cleanedFilter = { ...DEFAULT_FILTERS, ...storedFilter };
+                        // Remove the 'due' key if it was saved previously
+                        delete cleanedFilter.due;
+
+                        setFilters(cleanedFilter);
+
                         if (storedFilter.name) setName(storedFilter.name);
                         if (storedFilter.background) {
                             const b = storedFilter.background;
@@ -70,6 +79,10 @@ export default function PopupUI() {
                                 setBg(matched || b);
                             }
                         }
+                    } else {
+                        // Ensure setFilters is explicitly called even if no storedFilter exists 
+                        // This ensures the dependency array of the calculation useEffect is always triggered
+                        setFilters(DEFAULT_FILTERS);
                     }
                 }
 
@@ -92,25 +105,36 @@ export default function PopupUI() {
             console.log("here inside calculateActiveCount");
             try {
                 const allCards = await t.cards('all');
+
                 console.log("The value of allCards is here", allCards);
                 if (!Array.isArray(allCards)) return;
 
                 const matched = allCards.filter(card => {
                     if (card.closed) return false;
+
                     if (filters.cardId && card.id === filters.cardId) return false;
+
                     if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
 
+                    // FIX FOR MEMBER FILTERING: Use card.members and map to IDs
                     if (filters.memberId && filters.memberId !== 'any') {
-                        if (!card.idMembers?.includes(filters.memberId)) return false;
+                        const memberIds = Array.isArray(card.members) ? card.members.map(m => m.id) : [];
+                        if (!memberIds.includes(filters.memberId)) return false;
                     }
-                    if (filters.labelId && filters.labelId !== 'any' && (!card.idLabels || !card.idLabels.includes(filters.labelId))) return false;
 
+                    // FIX FOR LABEL FILTERING: Use card.labels and map to IDs
+                    if (filters.labelId && filters.labelId !== 'any') {
+                        const labelIds = Array.isArray(card.labels) ? card.labels.map(l => l.id) : [];
+                        if (!labelIds.includes(filters.labelId)) return false;
+                    }
 
                     return true;
                 });
+
                 console.log("The value of matched is here", matched);
                 setPreviewCount(matched.length);
             } catch (e) {
+                console.error("Error calculating active count:", e);
             }
         };
         const debounce = setTimeout(calculateActiveCount, 500);
@@ -155,7 +179,7 @@ export default function PopupUI() {
                     pos: "top"
                 });
 
-                const updatedFilters = { ...filters, cardId: newCard.id };
+                const updatedFilters = { listId: filters.listId, memberId: filters.memberId, labelId: filters.labelId, cardId: newCard.id };
                 setFilters(updatedFilters);
 
                 const config = {
@@ -216,7 +240,7 @@ export default function PopupUI() {
 
                 const card = await t.card('id');
 
-                const updatedFilters = { ...filters, cardId: card.id };
+                const updatedFilters = { listId: filters.listId, memberId: filters.memberId, labelId: filters.labelId, cardId: card.id };
                 setFilters(updatedFilters);
 
                 const config = {
@@ -388,17 +412,6 @@ export default function PopupUI() {
                             ))}
                         </select>
                     </div>
-
-                    {/* DUE DATE SELECT REMOVED as requested */}
-                    {/* <div className="dark-input-group">
-                        <label>clock Due</label>
-                        <select className="dark-select" value={filters.due} onChange={(e) => setFilters({ ...filters, due: e.target.value })}>
-                            <option value="any">Any time</option>
-                            <option value="overdue">Overdue</option>
-                            <option value="week">Due within a week</option>
-                        </select>
-                    </div> 
-                    */}
 
                     <div className="dark-input-group">
                         <label>Labels</label>
