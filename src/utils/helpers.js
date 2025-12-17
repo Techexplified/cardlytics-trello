@@ -1,86 +1,82 @@
 export async function calculateMatchCount(t) {
     try {
-        const { id: selfCardId } = await t.card('id');
+        // Use t.card('id') to get the current card ID
+        const cardData = await t.card('id');
+        const selfCardId = cardData.id;
 
-        let criteria = await t.get('card', 'shared', 'dashFilter');
-        if (!criteria) {
-            return [];
-        }
+        const criteria = await t.get('card', 'shared', 'dashFilter');
+        if (!criteria) return [];
 
-        const allCards = await t.board('all').get('cards', 'all');
-        if (!Array.isArray(allCards)) {
-            return [];
-        }
+        // Fetch board cards using the correct board capability
+        const boardData = await t.board('cards');
+        const allCards = boardData.cards;
+
+        if (!Array.isArray(allCards)) return [];
 
         const now = new Date();
-
         const matchedCards = allCards.filter(card => {
             if (card.closed) return false;
             if (card.id === selfCardId) return false;
 
-            if (criteria.listId && criteria.listId !== 'any' && card.idList !== criteria.listId) {
-                return false;
-            }
+            // List Filter
+            if (criteria.listId && criteria.listId !== 'any' && card.idList !== criteria.listId) return false;
 
+            // Member Filter
             if (criteria.memberId && criteria.memberId !== 'any') {
                 if (!card.idMembers?.includes(criteria.memberId)) return false;
             }
 
+            // Label Filter
             if (criteria.labelId && criteria.labelId !== 'any') {
-                if (!card.idLabels?.includes(criteria.labelId)) return false;
+                if (!card.idLabels?.some(l => l.id === criteria.labelId)) return false;
             }
 
+            // Due Date Filter
             if (criteria.due && criteria.due !== 'any') {
                 if (!card.due) return false;
-
                 const d = new Date(card.due);
-
                 if (criteria.due === 'overdue') {
                     if (d >= now || card.dueComplete) return false;
                 }
-
                 if (criteria.due === 'week') {
                     const next = new Date();
                     next.setDate(now.getDate() + 7);
                     if (d < now || d > next || card.dueComplete) return false;
                 }
             }
-
             return true;
         });
 
-        return [
-            {
-                text: String(matchedCards.length),
-                color: null
-            }
-        ];
+        return [{
+            text: String(matchedCards.length),
+            color: null
+        }];
     } catch (e) {
         console.error('Dashcard count failed:', e);
         return [];
     }
 }
 
-export const getFilteredCards = async (t, filterConfig) => {
+export const getFilteredCards = async (t, filters) => {
     try {
-        const allCards = await t.cards('all');
+        const allCards = await t.cards("all")
+
         if (!Array.isArray(allCards)) return [];
 
         return allCards.filter(card => {
             if (card.closed) return false;
 
-            if (filterConfig.cardId && card.id === filterConfig.cardId) return false;
+            if (filters.cardId && card.id === filters.cardId) return false;
 
-            if (filterConfig.listId && filterConfig.listId !== 'any' && card.idList !== filterConfig.listId) return false;
-
-            if (filterConfig.memberId && filterConfig.memberId !== 'any') {
+            if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
+            if (filters.memberId && filters.memberId !== 'any') {
                 const memberIds = Array.isArray(card.members) ? card.members.map(m => m.id) : [];
-                if (!memberIds.includes(filterConfig.memberId)) return false;
+                if (!memberIds.includes(filters.memberId)) return false;
             }
 
-            if (filterConfig.labelId && filterConfig.labelId !== 'any') {
+            if (filters.labelId && filters.labelId !== 'any') {
                 const labelIds = Array.isArray(card.labels) ? card.labels.map(l => l.id) : [];
-                if (!labelIds.includes(filterConfig.labelId)) return false;
+                if (!labelIds.includes(filters.labelId)) return false;
             }
 
             return true;

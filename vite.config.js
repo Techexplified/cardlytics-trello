@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 export default defineConfig({
   base: './',
   plugins: [
-    react(), 
+    react(),
     mkcert()
   ],
   build: {
@@ -21,11 +21,12 @@ export default defineConfig({
         popup: path.resolve(__dirname, "popup.html"),
         dashboard: path.resolve(__dirname, "dashboard.html"),
         settings: path.resolve(__dirname, "settings.html"),
-        testConnector: path.resolve(__dirname,"settings-connector-test.html"),
+        testConnector: path.resolve(__dirname, "settings-connector-test.html"),
+        detail: path.resolve(__dirname, "detail.html"),
       }
     }
   },
   server: {
-    https: true 
+    https: true
   }
 });

@@ -313,18 +313,6 @@ export default function PopupUI() {
         }
     };
 
-
-    const getTrelloColorName = (hex) => {
-        const preset = BACKGROUNDS.find(b => b.hex === hex || b.value === hex);
-        return preset ? preset.value : 'blue';
-    };
-
-    const getMemberName = (id) => {
-        const memberArray = Array.isArray(members) ? members : Object.values(members);
-        const member = memberArray.find(m => m.id === id);
-        return member ? member.fullName : 'Unknown Member';
-    }
-
     if (!t || loading) return <div className="loading-state" style={{ color: 'white' }}>Loading options...</div>;
 
     return (
@@ -449,7 +437,6 @@ export default function PopupUI() {
             </div>
 
             <div className="popup-footer">
-                <button className="btn btn-secondary" onClick={() => t.closePopup()}>Cancel</button>
                 <button className="btn btn-primary" onClick={saveConfiguration}>Start tracking</button>
             </div>
         </div>

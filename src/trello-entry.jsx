@@ -41,8 +41,8 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 						icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
 						content: {
 							type: 'iframe',
-							url: `${DEPLOY_URL}/detail.html`,
-							height: 700
+							url: t.signUrl(`${DEPLOY_URL}/detail.html`),
+							height: 250
 						}
 					}];
 				})

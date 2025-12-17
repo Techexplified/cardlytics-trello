@@ -6,7 +6,8 @@
   "capabilities": [
     "card-buttons",
     "show-settings",
-    "board-buttons"
+    "board-buttons",
+    "card-back-section"
   ],
   "card-buttons": {
     "url": "/card-button.html",
@@ -19,5 +20,9 @@
   "show-settings": {
     "url": "/settings.html",
     "height": 220
+  },
+  "card-back-section": {
+    "url": "/detail.html",
+    "height": 250
   }
 }
