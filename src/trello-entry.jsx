@@ -6,14 +6,16 @@ import { APP_KEY, DEPLOY_URL } from "./utils/constants";
 import { calculateMatchCount } from "./utils/helpers";
 import PopupUI from "./components/PopupUI";
 import DashboardUI from "./components/DashboardUI";
+import DashCardDetails from "./components/DashCardDetails";
 
 const TrelloPowerUp = window.TrelloPowerUp;
 
 const isPopup = typeof document !== 'undefined' && (!!document.getElementById("trello-popup-root") || window.location.pathname.includes("popup.html"));
 const isDashboard = typeof document !== 'undefined' && (!!document.getElementById("trello-dashboard-root") || window.location.pathname.includes("dashboard.html"));
 const isSettings = typeof document !== 'undefined' && (!!document.getElementById("trello-settings-root") || window.location.pathname.includes("settings.html"));
+const isDetail = typeof document !== 'undefined' && window.location.pathname.includes("detail.html");
 const isModal = typeof window !== 'undefined' && window.location.search.includes("mode=");
-const isConnector = !isPopup && !isDashboard && !isModal && !isSettings;
+const isConnector = !isPopup && !isDashboard && !isModal && !isSettings && !isDetail;
 
 if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 	window.TrelloPowerUp.initialize({
@@ -29,19 +31,19 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 			}];
 		},
 
-		// FIX 1: Add the card-details capability to display content in the card back
-		"card-details": function (t) {
+		"card-back-section": function (t) {
 			return t.get('card', 'shared', 'dashFilter')
 				.then(filter => {
-					// Only show the card detail section if the dashFilter exists
 					if (!filter) return [];
 
 					return [{
-						title: 'Dashcard Settings',
+						title: 'Dashcard Filter Details',
 						icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
-						// Use the same component/page as the popup for consistency
-						url: `${DEPLOY_URL}/popup.html?mode=edit`,
-						height: 700,
+						content: {
+							type: 'iframe',
+							url: `${DEPLOY_URL}/detail.html`,
+							height: 700
+						}
 					}];
 				})
 				.catch(() => []);
@@ -91,34 +93,30 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 function mount() {
 	if (isConnector) return;
 
-	const popupRoot = document.getElementById("trello-popup-root");
-	const dashboardRoot = document.getElementById("trello-dashboard-root");
+	const rootEl = document.getElementById("trello-popup-root") ||
+		document.getElementById("trello-dashboard-root") ||
+		document.getElementById("root") ||
+		document.body;
 
-	const params = new URLSearchParams(window.location.search);
-	const mode = params.get('mode');
+	if (isDetail || window.location.href.includes("detail.html")) {
+		createRoot(rootEl).render(<DashCardDetails />);
+		return;
+	}
 
-	if (popupRoot || document.getElementById("root") || mode || window.location.href.includes("popup.html") || isSettings) {
-		const rootEl = popupRoot || document.getElementById("root") || document.body;
-
-		if (rootEl === document.body) {
-			let container = document.getElementById('app-container');
-			if (!container) {
-				container = document.createElement('div');
-				container.id = 'app-container';
-				document.body.appendChild(container);
-			}
-		}
-
-		const target = document.getElementById('app-container') || rootEl;
-
+	if (rootEl) {
+		const dashboardRoot = document.getElementById("trello-dashboard-root");
 		if (dashboardRoot) {
 			createRoot(dashboardRoot).render(<DashboardUI />);
 		} else {
-			createRoot(target).render(<PopupUI />);
+			createRoot(rootEl).render(<PopupUI />);
 		}
 	}
 }
 
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', mount); } else { mount(); }
+if (document.readyState === 'loading') {
+	document.addEventListener('DOMContentLoaded', mount);
+} else {
+	mount();
+}
 
 export default TrelloPowerUp;

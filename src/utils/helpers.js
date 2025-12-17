@@ -1,5 +1,3 @@
-import { APP_KEY } from './constants';
-
 export async function calculateMatchCount(t) {
     try {
         const { id: selfCardId } = await t.card('id');
@@ -62,6 +60,36 @@ export async function calculateMatchCount(t) {
         return [];
     }
 }
+
+export const getFilteredCards = async (t, filterConfig) => {
+    try {
+        const allCards = await t.cards('all');
+        if (!Array.isArray(allCards)) return [];
+
+        return allCards.filter(card => {
+            if (card.closed) return false;
+
+            if (filterConfig.cardId && card.id === filterConfig.cardId) return false;
+
+            if (filterConfig.listId && filterConfig.listId !== 'any' && card.idList !== filterConfig.listId) return false;
+
+            if (filterConfig.memberId && filterConfig.memberId !== 'any') {
+                const memberIds = Array.isArray(card.members) ? card.members.map(m => m.id) : [];
+                if (!memberIds.includes(filterConfig.memberId)) return false;
+            }
+
+            if (filterConfig.labelId && filterConfig.labelId !== 'any') {
+                const labelIds = Array.isArray(card.labels) ? card.labels.map(l => l.id) : [];
+                if (!labelIds.includes(filterConfig.labelId)) return false;
+            }
+
+            return true;
+        });
+    } catch (e) {
+        console.error("Filter logic error:", e);
+        return [];
+    }
+};
 
 export function getUrlParam(name) {
     if (typeof window === "undefined") return null;

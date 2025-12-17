@@ -96,11 +96,9 @@ export default function PopupUI() {
         if (!t) return;
         // console.log("here inside useEffect"); Removed
         const calculateActiveCount = async () => {
-            // console.log("here inside calculateActiveCount"); Removed
             try {
                 const allCards = await t.cards('all');
 
-                // console.log("The value of allCards is here", allCards); Removed for final code
                 if (!Array.isArray(allCards)) return;
 
                 const matched = allCards.filter(card => {
@@ -109,14 +107,11 @@ export default function PopupUI() {
                     if (filters.cardId && card.id === filters.cardId) return false;
 
                     if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
-
-                    // Member Filter: Use card.members and map to IDs
                     if (filters.memberId && filters.memberId !== 'any') {
                         const memberIds = Array.isArray(card.members) ? card.members.map(m => m.id) : [];
                         if (!memberIds.includes(filters.memberId)) return false;
                     }
 
-                    // Label Filter: Use card.labels and map to IDs
                     if (filters.labelId && filters.labelId !== 'any') {
                         const labelIds = Array.isArray(card.labels) ? card.labels.map(l => l.id) : [];
                         if (!labelIds.includes(filters.labelId)) return false;
@@ -125,7 +120,6 @@ export default function PopupUI() {
                     return true;
                 });
 
-                // console.log("The value of matched is here", matched); Removed for final code
                 setPreviewCount(matched.length);
                 setMatchedCards(matched);
             } catch (e) {
@@ -248,7 +242,7 @@ export default function PopupUI() {
                 await t.set('card', 'shared', 'dashFilter', config);
                 await t.set('card', 'shared', 'isDashCard', true);
 
-                t.render();
+                // No t.render() call here to avoid TypeError.
 
                 let token = null;
                 try {
