@@ -1,5 +1,5 @@
-export const DEPLOY_URL = "https://localhost:4173";
-export const APP_KEY = '0919ce148a7f8507be8f698a755ffeda';
+export const DEPLOY_URL = import.meta.env.VITE_DEPLOY_URL;
+export const APP_KEY = import.meta.env.VITE_APP_KEY;
 
 export const BACKGROUNDS = [
     { type: 'color', value: 'blue', name: 'Blue', hex: '#0079bf' },
