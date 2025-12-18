@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { APP_KEY, BACKGROUNDS } from "../utils/constants";
 import { searchUnsplashPhotos } from "../utils/unsplashApi";
-import { getUrlParam } from "../utils/helpers";
+import { getUrlParam, createCompositeImage } from "../utils/helpers";
 
 export default function PopupUI() {
     const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'Dashcards' }) : null;
@@ -144,68 +144,6 @@ export default function PopupUI() {
         return () => clearTimeout(debounce);
     }, [filters, lists, loading, t]);
 
-    const createCompositeImage = (bg, count, title) => {
-        return new Promise((resolve, reject) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 600;
-            canvas.height = 320;
-
-            const drawContent = () => {
-                // Dark overlay for readability if image
-                if (bg.type === 'image') {
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                }
-
-                // Draw Count
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 140px "Arial", sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(count, canvas.width / 2, (canvas.height / 2) - 20);
-
-                // Draw Title
-                ctx.font = 'bold 30px "Arial", sans-serif';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'bottom';
-                ctx.fillStyle = '#ffffff';
-                ctx.fillText(title || "Dashcard", 30, canvas.height - 30);
-
-                canvas.toBlob(blob => {
-                    resolve(blob);
-                }, 'image/png');
-            };
-
-            if (bg.type === 'color') {
-                ctx.fillStyle = bg.hex || bg.value || '#0079bf';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                drawContent();
-            } else if (bg.type === 'image') {
-                const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.onload = () => {
-                    const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
-                    const x = (canvas.width / 2) - (img.width / 2) * scale;
-                    const y = (canvas.height / 2) - (img.height / 2) * scale;
-                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-                    drawContent();
-                };
-                img.onerror = (err) => {
-                    console.error("Image load failed", err);
-                    ctx.fillStyle = '#333333';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    drawContent();
-                };
-                img.src = bg.value;
-            } else {
-                ctx.fillStyle = '#0079bf';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                drawContent();
-            }
-        });
-    };
-
     const saveConfiguration = async () => {
         if (!t) return;
 
@@ -246,7 +184,8 @@ export default function PopupUI() {
                     name,
                     background: bg,
                     listId: targetListId,
-                    cardId: newCard.id
+                    cardId: newCard.id,
+                    lastCount: previewCount
                 };
 
                 const descPayload = `DASHCARD_CONFIG|${JSON.stringify(config)}`;
@@ -314,7 +253,8 @@ export default function PopupUI() {
                     ...updatedFilters,
                     name,
                     background: bg,
-                    cardId: card.id
+                    cardId: card.id,
+                    lastCount: previewCount
                 };
 
                 await t.set('card', 'shared', 'dashFilter', config);

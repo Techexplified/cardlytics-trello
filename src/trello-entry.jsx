@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./styles.css";
 
 import { APP_KEY, DEPLOY_URL } from "./utils/constants";
-import { calculateMatchCount } from "./utils/helpers";
+import { calculateMatchCount, createCompositeImage } from "./utils/helpers";
 import PopupUI from "./components/PopupUI";
 import DashboardUI from "./components/DashboardUI";
 import DashCardDetails from "./components/DashCardDetails";
@@ -33,18 +33,72 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 
 		"card-badges": function (t) {
 			return t.get('card', 'shared', 'dashFilter')
-				.then(filter => {
+				.then(async filter => {
 					if (!filter) return [];
 					return [{
-						dynamic: function () {
-							return calculateMatchCount(t)
-								.then(result => {
-									if (result && result.length > 0) {
-										return { title: 'Dashcard', text: result[0].text, color: 'light-gray', refresh: 10 };
+						dynamic: async function () {
+							try {
+								const result = await calculateMatchCount(t);
+								if (result && result.length > 0) {
+									const count = result[0].text;
+
+									// Auto-update cover if count changed
+									if (filter.lastCount != count) {
+										try {
+											const rest = t.getRestApi();
+											if (await rest.isAuthorized()) {
+												const token = await rest.getToken();
+												if (token) {
+													const card = await t.card('id');
+													console.log("Starting....")
+													const blob = await createCompositeImage(filter.background, count, filter.name);
+													console.log("Completed....")
+													const formData = new FormData();
+													formData.append('file', blob, 'cover.png');
+													formData.append('key', APP_KEY);
+													formData.append('token', token);
+
+													const attachRes = await fetch(
+														`https://api.trello.com/1/cards/${card.id}/attachments`,
+														{ method: "POST", body: formData }
+													);
+
+													if (attachRes.ok) {
+														const attachData = await attachRes.json();
+														// Set cover
+														await fetch(`https://api.trello.com/1/cards/${card.id}?key=${APP_KEY}&token=${token}`, {
+															method: "PUT",
+															headers: { "Content-Type": "application/json" },
+															body: JSON.stringify({
+																cover: {
+																	idAttachment: attachData.id,
+																	color: null,
+																	size: "full",
+																	brightness: "dark"
+																}
+															})
+														});
+
+														// Cleanup old attachments (optional but good)
+														// Skipping for speed/simplicity in auto-update to avoid race conditions
+
+														// Update stored lastCount
+														filter.lastCount = count;
+														await t.set('card', 'shared', 'dashFilter', filter);
+													}
+												}
+											}
+										} catch (err) {
+											// console.warn("Auto-update failed", err);
+										}
 									}
-									return { text: '?' };
-								})
-								.catch(() => ({ text: '?' }));
+
+									return { title: 'Dashcard', text: count, color: 'light-gray', refresh: 10 };
+								}
+								return { text: '?' };
+							} catch (e) {
+								return { text: '?' };
+							}
 						}
 					}];
 				})

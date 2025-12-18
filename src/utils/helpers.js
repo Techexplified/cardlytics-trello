@@ -7,9 +7,8 @@ export async function calculateMatchCount(t) {
         const criteria = await t.get('card', 'shared', 'dashFilter');
         if (!criteria) return [];
 
-        // Fetch board cards using the correct board capability
-        const boardData = await t.board('cards');
-        const allCards = boardData.cards;
+        // Fetch all cards using t.cards('all')
+        const allCards = await t.cards('all');
 
         if (!Array.isArray(allCards)) return [];
 
@@ -23,12 +22,14 @@ export async function calculateMatchCount(t) {
 
             // Member Filter
             if (criteria.memberId && criteria.memberId !== 'any') {
-                if (!card.idMembers?.includes(criteria.memberId)) return false;
+                const members = card.idMembers || (card.members ? card.members.map(m => m.id) : []);
+                if (!members.includes(criteria.memberId)) return false;
             }
 
             // Label Filter
             if (criteria.labelId && criteria.labelId !== 'any') {
-                if (!card.idLabels?.some(l => l.id === criteria.labelId)) return false;
+                const labels = card.idLabels || (card.labels ? card.labels.map(l => l.id) : []);
+                if (!labels.includes(criteria.labelId)) return false;
             }
 
             // Due Date Filter
@@ -92,3 +93,65 @@ export function getUrlParam(name) {
     const params = new URLSearchParams(window.location.search);
     return params.get(name);
 }
+
+export const createCompositeImage = (bg, count, title) => {
+    return new Promise((resolve, reject) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 600;
+        canvas.height = 320;
+
+        const drawContent = () => {
+            // Dark overlay for readability if image
+            if (bg.type === 'image') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Draw Count
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 140px "Arial", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(count, canvas.width / 2, (canvas.height / 2) - 20);
+
+            // Draw Title
+            ctx.font = 'bold 30px "Arial", sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(title || "Dashcard", 30, canvas.height - 30);
+
+            canvas.toBlob(blob => {
+                resolve(blob);
+            }, 'image/png');
+        };
+
+        if (bg.type === 'color') {
+            ctx.fillStyle = bg.hex || bg.value || '#0079bf';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawContent();
+        } else if (bg.type === 'image') {
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = () => {
+                const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+                const x = (canvas.width / 2) - (img.width / 2) * scale;
+                const y = (canvas.height / 2) - (img.height / 2) * scale;
+                ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                drawContent();
+            };
+            img.onerror = (err) => {
+                console.error("Image load failed", err);
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                drawContent();
+            };
+            img.src = bg.value;
+        } else {
+            ctx.fillStyle = '#0079bf';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawContent();
+        }
+    });
+};
