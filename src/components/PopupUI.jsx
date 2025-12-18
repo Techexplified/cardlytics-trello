@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { APP_KEY, BACKGROUNDS } from "../utils/constants";
+import { searchUnsplashPhotos } from "../utils/unsplashApi";
 import { getUrlParam } from "../utils/helpers";
 
 export default function PopupUI() {
@@ -18,6 +19,18 @@ export default function PopupUI() {
 
     const creationMode = getUrlParam("mode") === "create";
     const [targetListId, setTargetListId] = useState("");
+
+    const [unsplashQuery, setUnsplashQuery] = useState("");
+    const [unsplashImages, setUnsplashImages] = useState([]);
+    const [isSearchingUnsplash, setIsSearchingUnsplash] = useState(false);
+
+    const handleUnsplashSearch = async () => {
+        if (!unsplashQuery) return;
+        setIsSearchingUnsplash(true);
+        const images = await searchUnsplashPhotos(unsplashQuery);
+        setUnsplashImages(images);
+        setIsSearchingUnsplash(false);
+    };
 
     useEffect(() => {
         if (!t) return;
@@ -56,7 +69,7 @@ export default function PopupUI() {
                                 storedFilter = JSON.parse(c.desc.replace('DASHCARD_CONFIG|', ''));
                             }
                         } catch (e) {
-                            // console.log(e); Removed
+                            // console.log(e);
                         }
                     }
 
@@ -73,6 +86,8 @@ export default function PopupUI() {
                             } else if (b.value) {
                                 const matched = BACKGROUNDS.find(x => x.value === b.value || x.hex === b.value);
                                 setBg(matched || b);
+                            } else if (b.type === 'image') {
+                                setBg(b);
                             }
                         }
                     } else {
@@ -94,7 +109,6 @@ export default function PopupUI() {
 
     useEffect(() => {
         if (!t) return;
-        // console.log("here inside useEffect"); Removed
         const calculateActiveCount = async () => {
             try {
                 const allCards = await t.cards('all');
@@ -188,30 +202,37 @@ export default function PopupUI() {
                 });
 
                 // 3. Set visual cover
-                if (token && bg.type === 'color') {
-                    const imageUrl = getCoverUrl(bg.hex || "#0079bf", previewCount);
+                if (token) {
+                    let imageUrl = "";
+                    if (bg.type === 'color') {
+                        imageUrl = getCoverUrl(bg.hex || "#0079bf", previewCount);
+                    } else if (bg.type === 'image') {
+                        imageUrl = bg.value;
+                    }
 
-                    // Upload attachment
-                    const attachRes = await fetch(
-                        `https://api.trello.com/1/cards/${newCard.id}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`,
-                        { method: "POST" }
-                    );
+                    if (imageUrl) {
+                        // Upload attachment
+                        const attachRes = await fetch(
+                            `https://api.trello.com/1/cards/${newCard.id}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`,
+                            { method: "POST" }
+                        );
 
-                    if (attachRes.ok) {
-                        const attachData = await attachRes.json();
+                        if (attachRes.ok) {
+                            const attachData = await attachRes.json();
 
-                        await fetch(`https://api.trello.com/1/cards/${newCard.id}?key=${APP_KEY}&token=${token}`, {
-                            method: "PUT",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                cover: {
-                                    idAttachment: attachData.id,
-                                    color: null,
-                                    size: "full",
-                                    brightness: "dark"
-                                }
-                            })
-                        });
+                            await fetch(`https://api.trello.com/1/cards/${newCard.id}?key=${APP_KEY}&token=${token}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    cover: {
+                                        idAttachment: attachData.id,
+                                        color: null,
+                                        size: "full",
+                                        brightness: "dark"
+                                    }
+                                })
+                            });
+                        }
                     }
                 }
 
@@ -242,8 +263,6 @@ export default function PopupUI() {
                 await t.set('card', 'shared', 'dashFilter', config);
                 await t.set('card', 'shared', 'isDashCard', true);
 
-                // No t.render() call here to avoid TypeError.
-
                 let token = null;
                 try {
                     const rest = t.getRestApi();
@@ -271,9 +290,14 @@ export default function PopupUI() {
                         }
 
                         // Update cover
+                        let imageUrl = "";
                         if (bg.type === 'color') {
-                            const imageUrl = getCoverUrl(bg.hex || "#0079bf", previewCount);
+                            imageUrl = getCoverUrl(bg.hex || "#0079bf", previewCount);
+                        } else if (bg.type === 'image') {
+                            imageUrl = bg.value;
+                        }
 
+                        if (imageUrl) {
                             const attachRes = await fetch(
                                 `https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`,
                                 { method: "POST" }
@@ -350,14 +374,54 @@ export default function PopupUI() {
                                 Change background
                             </div>
                             {showBgPicker && (
-                                <div className="bg-picker-grid">
-                                    {BACKGROUNDS.map((b, i) => (
-                                        <div key={i} className="bg-option" style={{
-                                            backgroundColor: b.type === 'color' ? (b.hex || b.value) : '#ccc',
-                                            backgroundImage: b.type === 'image' ? `url(${b.value})` : 'none',
-                                            backgroundSize: 'cover'
-                                        }} onClick={() => { setBg(b); setShowBgPicker(false); }}></div>
-                                    ))}
+                                <div className="bg-picker-grid" style={{ width: '320px', maxHeight: '400px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+                                        {BACKGROUNDS.map((b, i) => (
+                                            <div key={i} className="bg-option" style={{
+                                                backgroundColor: b.type === 'color' ? (b.hex || b.value) : '#ccc',
+                                                backgroundImage: b.type === 'image' ? `url(${b.value})` : 'none',
+                                                backgroundSize: 'cover',
+                                                height: '40px'
+                                            }} onClick={() => { setBg(b); setShowBgPicker(false); }}></div>
+                                        ))}
+                                    </div>
+
+                                    <div style={{ borderTop: '1px solid #383b45', paddingTop: '10px' }}>
+                                        <label style={{ fontSize: '12px', color: '#9fadbc', marginBottom: '5px', display: 'block' }}>UNSPLASH</label>
+                                        <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+                                            <input
+                                                type="text"
+                                                className="dark-input"
+                                                style={{ padding: '6px', fontSize: '12px' }}
+                                                placeholder="Search photos..."
+                                                value={unsplashQuery}
+                                                onChange={(e) => setUnsplashQuery(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleUnsplashSearch()}
+                                            />
+                                            <button className="btn btn-primary" style={{ padding: '6px 10px', fontSize: '12px' }} onClick={handleUnsplashSearch} disabled={isSearchingUnsplash}>
+                                                Go
+                                            </button>
+                                        </div>
+
+                                        {unsplashImages.length > 0 && (
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                                                {unsplashImages.map((img) => (
+                                                    <div key={img.id} className="bg-option" style={{
+                                                        backgroundImage: `url(${img.thumb})`,
+                                                        backgroundSize: 'cover',
+                                                        height: '60px',
+                                                        borderRadius: '4px'
+                                                    }} onClick={() => {
+                                                        setBg({ type: 'image', value: img.url });
+                                                        setShowBgPicker(false);
+                                                    }}></div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {unsplashImages.length === 0 && !isSearchingUnsplash && unsplashQuery && (
+                                            <div style={{ fontSize: '12px', color: '#9fadbc', textAlign: 'center' }}>No results</div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
