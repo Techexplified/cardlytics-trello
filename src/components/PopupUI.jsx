@@ -144,6 +144,67 @@ export default function PopupUI() {
         return () => clearTimeout(debounce);
     }, [filters, lists, loading, t]);
 
+    const createCompositeImage = (bg, count, title) => {
+        return new Promise((resolve, reject) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 600;
+            canvas.height = 320;
+
+            const drawContent = () => {
+                // Dark overlay for readability if image
+                if (bg.type === 'image') {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+
+                // Draw Count
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 140px "Arial", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(count, canvas.width / 2, (canvas.height / 2) - 20);
+
+                // Draw Title
+                ctx.font = 'bold 30px "Arial", sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'bottom';
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(title || "Dashcard", 30, canvas.height - 30);
+
+                canvas.toBlob(blob => {
+                    resolve(blob);
+                }, 'image/png');
+            };
+
+            if (bg.type === 'color') {
+                ctx.fillStyle = bg.hex || bg.value || '#0079bf';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                drawContent();
+            } else if (bg.type === 'image') {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.onload = () => {
+                    const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+                    const x = (canvas.width / 2) - (img.width / 2) * scale;
+                    const y = (canvas.height / 2) - (img.height / 2) * scale;
+                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                    drawContent();
+                };
+                img.onerror = (err) => {
+                    console.error("Image load failed", err);
+                    ctx.fillStyle = '#333333';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    drawContent();
+                };
+                img.src = bg.value;
+            } else {
+                ctx.fillStyle = '#0079bf';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                drawContent();
+            }
+        });
+    };
 
     const saveConfiguration = async () => {
         if (!t) return;
@@ -152,11 +213,6 @@ export default function PopupUI() {
             try { t.closeModal(); } catch (e) {
                 try { t.closePopup(); } catch (e2) { /* ignore */ }
             }
-        };
-
-        const getCoverUrl = (hexColor, count) => {
-            const cleanHex = hexColor.replace('#', '');
-            return `https://placehold.co/600x400/${cleanHex}/ffffff.png?text=${count}`;
         };
 
         if (creationMode) {
@@ -201,20 +257,19 @@ export default function PopupUI() {
                     body: JSON.stringify({ desc: descPayload })
                 });
 
-                // 3. Set visual cover
+                // 3. Generate and Set visual cover
                 if (token) {
-                    let imageUrl = "";
-                    if (bg.type === 'color') {
-                        imageUrl = getCoverUrl(bg.hex || "#0079bf", previewCount);
-                    } else if (bg.type === 'image') {
-                        imageUrl = bg.value;
-                    }
+                    try {
+                        const blob = await createCompositeImage(bg, previewCount, name);
+                        const formData = new FormData();
+                        formData.append('file', blob, 'cover.png');
+                        formData.append('key', APP_KEY);
+                        formData.append('token', token);
 
-                    if (imageUrl) {
                         // Upload attachment
                         const attachRes = await fetch(
-                            `https://api.trello.com/1/cards/${newCard.id}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`,
-                            { method: "POST" }
+                            `https://api.trello.com/1/cards/${newCard.id}/attachments`,
+                            { method: "POST", body: formData }
                         );
 
                         if (attachRes.ok) {
@@ -233,6 +288,8 @@ export default function PopupUI() {
                                 })
                             });
                         }
+                    } catch (imgErr) {
+                        console.error("Cover generation failed:", imgErr);
                     }
                 }
 
@@ -289,55 +346,52 @@ export default function PopupUI() {
                             });
                         }
 
-                        // Update cover
-                        let imageUrl = "";
-                        if (bg.type === 'color') {
-                            imageUrl = getCoverUrl(bg.hex || "#0079bf", previewCount);
-                        } else if (bg.type === 'image') {
-                            imageUrl = bg.value;
+                        // Update cover with composite image
+                        try {
+                            // Clean up previous attachments
+                            const existingAttachments = await fetch(
+                                `https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}`,
+                                { method: "GET" }
+                            ).then(res => res.json());
+
+                            if (Array.isArray(existingAttachments)) {
+                                await Promise.all(existingAttachments.map(att =>
+                                    fetch(
+                                        `https://api.trello.com/1/cards/${cardId}/attachments/${att.id}?key=${APP_KEY}&token=${token}`,
+                                        { method: "DELETE" }
+                                    )
+                                ));
+                            }
+                        } catch (cleanupErr) {
+                            console.warn("Attachment cleanup failed:", cleanupErr);
                         }
 
-                        if (imageUrl) {
-                            try {
-                                // Clean up previous attachments
-                                const existingAttachments = await fetch(
-                                    `https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}`,
-                                    { method: "GET" }
-                                ).then(res => res.json());
+                        const blob = await createCompositeImage(bg, previewCount, name);
+                        const formData = new FormData();
+                        formData.append('file', blob, 'cover.png');
+                        formData.append('key', APP_KEY);
+                        formData.append('token', token);
 
-                                if (Array.isArray(existingAttachments)) {
-                                    await Promise.all(existingAttachments.map(att =>
-                                        fetch(
-                                            `https://api.trello.com/1/cards/${cardId}/attachments/${att.id}?key=${APP_KEY}&token=${token}`,
-                                            { method: "DELETE" }
-                                        )
-                                    ));
-                                }
-                            } catch (cleanupErr) {
-                                console.warn("Attachment cleanup failed:", cleanupErr);
-                            }
+                        const attachRes = await fetch(
+                            `https://api.trello.com/1/cards/${cardId}/attachments`,
+                            { method: "POST", body: formData }
+                        );
 
-                            const attachRes = await fetch(
-                                `https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`,
-                                { method: "POST" }
-                            );
+                        if (attachRes.ok) {
+                            const attachData = await attachRes.json();
 
-                            if (attachRes.ok) {
-                                const attachData = await attachRes.json();
-
-                                await fetch(`https://api.trello.com/1/cards/${cardId}?key=${APP_KEY}&token=${token}`, {
-                                    method: "PUT",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                        cover: {
-                                            idAttachment: attachData.id,
-                                            color: null,
-                                            size: "full",
-                                            brightness: "dark"
-                                        }
-                                    })
-                                });
-                            }
+                            await fetch(`https://api.trello.com/1/cards/${cardId}?key=${APP_KEY}&token=${token}`, {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    cover: {
+                                        idAttachment: attachData.id,
+                                        color: null,
+                                        size: "full",
+                                        brightness: "dark"
+                                    }
+                                })
+                            });
                         }
                     } catch (apiErr) {
                         console.error("API Update failed:", apiErr);
