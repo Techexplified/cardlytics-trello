@@ -315,6 +315,14 @@ export default function PopupUI() {
 
     if (!t || loading) return <div className="loading-state" style={{ color: 'white' }}>Loading options...</div>;
 
+    const COLORS = {
+        background: '#242528',
+        cardItem: '#2c333a',
+        textMain: '#ffffff',
+        textDim: '#8c9bab',
+        border: '#38414a'
+    };
+
     return (
         <div className="dashcard-popup">
             <div className="popup-body">
@@ -410,27 +418,37 @@ export default function PopupUI() {
                 <div className="matched-cards-section" style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
                     <h4 style={{ color: 'white', marginBottom: '10px' }}>Matched Cards ({matchedCards.length})</h4>
                     <ul style={{ listStyle: 'none', padding: 0, maxHeight: '150px', overflowY: 'auto' }}>
-                        {matchedCards.length > 0 ? (
-                            matchedCards.map(card => (
-                                <li key={card.id} style={{
-                                    backgroundColor: '#282c34',
-                                    padding: '8px',
-                                    marginBottom: '5px',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    color: '#ccc'
+                        <div style={{ display: 'grid', gap: '8px' }}>
+                            {matchedCards.length > 0 ? (
+                                matchedCards.map(card => (
+                                    <div key={card.id} style={{
+                                        background: COLORS.cardItem,
+                                        border: `1px solid ${COLORS.border}`,
+                                        padding: '10px',
+                                        borderRadius: '3px',
+                                        cursor: 'pointer',
+                                        borderLeft: `3px solid '#0079bf'`,
+                                    }}
+                                        onClick={() => t.showCard(card.id)}
+                                    >
+                                        <div style={{ fontSize: '14px', color: COLORS.textMain, fontWeight: '500' }}>
+                                            {card.name}
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div style={{
+                                    padding: '20px',
+                                    textAlign: 'center',
+                                    color: COLORS.textDim,
+                                    fontSize: '13px',
+                                    border: `1px dashed ${COLORS.border}`,
+                                    borderRightColor: '#00a0fdff',
                                 }}>
-                                    <strong>{card.name}</strong>
-                                    {card.members && card.members.length > 0 &&
-                                        <span style={{ marginLeft: '10px', color: '#0079bf' }}>
-                                            (Assigned to: {card.members.map(m => m.fullName || m.id).join(', ')})
-                                        </span>
-                                    }
-                                </li>
-                            ))
-                        ) : (
-                            <li style={{ color: '#999', fontSize: '12px' }}>No cards matched the current filters.</li>
-                        )}
+                                    No cards currently match filters
+                                </div>
+                            )}
+                        </div>
                     </ul>
                 </div>
 
