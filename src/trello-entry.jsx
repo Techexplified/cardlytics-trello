@@ -31,6 +31,26 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 			}];
 		},
 
+		"card-badges": function (t) {
+			return t.get('card', 'shared', 'dashFilter')
+				.then(filter => {
+					if (!filter) return [];
+					return [{
+						dynamic: function () {
+							return calculateMatchCount(t)
+								.then(result => {
+									if (result && result.length > 0) {
+										return { title: 'Dashcard', text: result[0].text, color: 'light-gray', refresh: 10 };
+									}
+									return { text: '?' };
+								})
+								.catch(() => ({ text: '?' }));
+						}
+					}];
+				})
+				.catch(() => []);
+		},
+
 		"card-back-section": function (t) {
 			return t.get('card', 'shared', 'dashFilter')
 				.then(filter => {
@@ -49,20 +69,6 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 				.catch(() => []);
 		},
 
-		"card-badges": function (t) {
-			return t.get('card', 'shared', 'dashFilter')
-				.then(filter => {
-					if (!filter) return [];
-					return [{
-						dynamic: function () {
-							return calculateMatchCount(t)
-								.then(result => ({ title: 'Dashcard', text: result.text, color: 'light-gray', refresh: 10 }))
-								.catch(() => ({ text: '?' }));
-						}
-					}];
-				})
-				.catch(() => []);
-		},
 
 		"board-buttons": function (t) {
 			return [{

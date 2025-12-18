@@ -298,6 +298,25 @@ export default function PopupUI() {
                         }
 
                         if (imageUrl) {
+                            try {
+                                // Clean up previous attachments
+                                const existingAttachments = await fetch(
+                                    `https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}`,
+                                    { method: "GET" }
+                                ).then(res => res.json());
+
+                                if (Array.isArray(existingAttachments)) {
+                                    await Promise.all(existingAttachments.map(att =>
+                                        fetch(
+                                            `https://api.trello.com/1/cards/${cardId}/attachments/${att.id}?key=${APP_KEY}&token=${token}`,
+                                            { method: "DELETE" }
+                                        )
+                                    ));
+                                }
+                            } catch (cleanupErr) {
+                                console.warn("Attachment cleanup failed:", cleanupErr);
+                            }
+
                             const attachRes = await fetch(
                                 `https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}&url=${encodeURIComponent(imageUrl)}`,
                                 { method: "POST" }
