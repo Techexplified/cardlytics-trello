@@ -1,13 +1,10 @@
 export async function calculateMatchCount(t) {
     try {
-        // Use t.card('id') to get the current card ID
         const cardData = await t.card('id');
         const selfCardId = cardData.id;
 
         const criteria = await t.get('card', 'shared', 'dashFilter');
         if (!criteria) return [];
-
-        // Fetch all cards using t.cards('all')
         const allCards = await t.cards('all');
 
         if (!Array.isArray(allCards)) return [];
@@ -17,22 +14,18 @@ export async function calculateMatchCount(t) {
             if (card.closed) return false;
             if (card.id === selfCardId) return false;
 
-            // List Filter
             if (criteria.listId && criteria.listId !== 'any' && card.idList !== criteria.listId) return false;
 
-            // Member Filter
             if (criteria.memberId && criteria.memberId !== 'any') {
                 const members = card.idMembers || (card.members ? card.members.map(m => m.id) : []);
                 if (!members.includes(criteria.memberId)) return false;
             }
 
-            // Label Filter
             if (criteria.labelId && criteria.labelId !== 'any') {
                 const labels = card.idLabels || (card.labels ? card.labels.map(l => l.id) : []);
                 if (!labels.includes(criteria.labelId)) return false;
             }
 
-            // Due Date Filter
             if (criteria.due && criteria.due !== 'any') {
                 if (!card.due) return false;
                 const d = new Date(card.due);
@@ -70,14 +63,15 @@ export const getFilteredCards = async (t, filters) => {
             if (filters.cardId && card.id === filters.cardId) return false;
 
             if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
+
             if (filters.memberId && filters.memberId !== 'any') {
-                const memberIds = Array.isArray(card.members) ? card.members.map(m => m.id) : [];
-                if (!memberIds.includes(filters.memberId)) return false;
+                const members = card.idMembers || (card.members ? card.members.map(m => m.id) : []);
+                if (!members.includes(filters.memberId)) return false;
             }
 
             if (filters.labelId && filters.labelId !== 'any') {
-                const labelIds = Array.isArray(card.labels) ? card.labels.map(l => l.id) : [];
-                if (!labelIds.includes(filters.labelId)) return false;
+                const labels = card.idLabels || (card.labels ? card.labels.map(l => l.id) : []);
+                if (!labels.includes(filters.labelId)) return false;
             }
 
             return true;

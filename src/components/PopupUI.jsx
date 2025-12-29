@@ -122,13 +122,29 @@ export default function PopupUI() {
 
                     if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
                     if (filters.memberId && filters.memberId !== 'any') {
-                        const memberIds = Array.isArray(card.members) ? card.members.map(m => m.id) : [];
-                        if (!memberIds.includes(filters.memberId)) return false;
+                        // Trello API 'cards/all' returns idMembers array, not full member objects
+                        if (card.idMembers) {
+                            if (!card.idMembers.includes(filters.memberId)) return false;
+                        } else if (card.members) {
+                            // Fallback if some context provides members
+                            const memberIds = card.members.map(m => m.id);
+                            if (!memberIds.includes(filters.memberId)) return false;
+                        } else {
+                            // If user selected a member filter but card has no member info, skip it
+                            return false;
+                        }
                     }
 
                     if (filters.labelId && filters.labelId !== 'any') {
-                        const labelIds = Array.isArray(card.labels) ? card.labels.map(l => l.id) : [];
-                        if (!labelIds.includes(filters.labelId)) return false;
+                        // Trello API 'cards/all' returns idLabels array
+                        if (card.idLabels) {
+                            if (!card.idLabels.includes(filters.labelId)) return false;
+                        } else if (card.labels) {
+                            const labelIds = card.labels.map(l => l.id);
+                            if (!labelIds.includes(filters.labelId)) return false;
+                        } else {
+                            return false;
+                        }
                     }
 
                     return true;
@@ -169,12 +185,19 @@ export default function PopupUI() {
                     }
                 } catch (err) { /* ignore */ }
 
-                // 1. Create the Dashcard
-                const newCard = await t.createCard(targetListId, {
-                    name: name || "Dashcard",
-                    desc: "Temporary config holder",
-                    pos: "top"
+                // 1. Create the Dashcard (Using REST API because t.createCard is not a standard Power-Up client method for this context)
+                let newCard;
+                const creationUrl = `https://api.trello.com/1/cards?idList=${targetListId}&name=${encodeURIComponent(name || "Dashcard")}&desc=Temporary config holder&pos=top&key=${APP_KEY}&token=${token}`;
+
+                const createRes = await fetch(creationUrl, {
+                    method: 'POST'
                 });
+
+                if (!createRes.ok) {
+                    throw new Error("Failed to create card via API");
+                }
+
+                newCard = await createRes.json();
 
                 const updatedFilters = { listId: filters.listId, memberId: filters.memberId, labelId: filters.labelId, cardId: newCard.id };
                 setFilters(updatedFilters);
