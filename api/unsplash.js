@@ -6,28 +6,30 @@ export default async function handler(req, res) {
       `https://api.unsplash.com/search/photos?page=${page}&per_page=${perPage}&query=${encodeURIComponent(q)}`,
       {
         headers: {
-          Authorization: `Client-ID ${import.meta.env.VITE_UNSPLASH_KEY}`
+          Authorization: `Client-ID ${process.env.UNSPLASH_ACCESS_KEY}`
         }
       }
     );
 
     if (!response.ok) {
-      return res.status(response.status).json([]);
+      const text = await response.text();
+      return res.status(response.status).json({ error: text });
     }
 
     const data = await response.json();
 
-    const results = data.results.map(photo => ({
-      id: photo.id,
-      url: photo.urls.regular,
-      thumb: photo.urls.small,
-      alt: photo.alt_description,
-      user: photo.user.name,
-      userLink: photo.user.links.html
-    }));
-
-    res.status(200).json(results);
-  } catch  {
-    res.status(500).json([]);
+    res.status(200).json(
+      data.results.map(photo => ({
+        id: photo.id,
+        url: photo.urls.regular,
+        thumb: photo.urls.small,
+        alt: photo.alt_description,
+        user: photo.user.name,
+        userLink: photo.user.links.html
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 }

@@ -69,7 +69,7 @@ export default function PopupUI() {
                                 storedFilter = JSON.parse(c.desc.replace('DASHCARD_CONFIG|', ''));
                             }
                         } catch (e) {
-                            // console.log(e);
+                            console.log(e);
                         }
                     }
 
