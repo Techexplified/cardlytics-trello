@@ -1,18 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import mkcert from 'vite-plugin-mkcert';
-import { fileURLToPath } from 'url';
+import mkcert from "vite-plugin-mkcert";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default defineConfig({
-  base: './',
-  plugins: [
-    react(),
-    mkcert()
-  ],
+  base: "./",
+  plugins: [react(), mkcert()],
   build: {
     rollupOptions: {
       input: {
@@ -23,10 +20,16 @@ export default defineConfig({
         settings: path.resolve(__dirname, "settings.html"),
         testConnector: path.resolve(__dirname, "settings-connector-test.html"),
         detail: path.resolve(__dirname, "detail.html"),
-      }
-    }
+      },
+    },
   },
   server: {
-    https: true
-  }
+    https: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:5173",
+        changeOrigin: true,
+      },
+    },
+  },
 });
