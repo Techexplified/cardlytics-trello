@@ -50,9 +50,9 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 												const token = await rest.getToken();
 												if (token) {
 													const card = await t.card('id');
-													console.log("Starting....")
+
 													const blob = await createCompositeImage(filter.background, count, filter.name);
-													console.log("Completed....")
+
 													const formData = new FormData();
 													formData.append('file', blob, 'cover.png');
 													formData.append('key', APP_KEY);

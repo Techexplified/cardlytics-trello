@@ -31,7 +31,7 @@ export default function DashCardDetails() {
             setMatchedCards(matched);
             setFilter(storedFilter);
         } catch (err) {
-            console.error("Detail View Load Error:", err);
+
         } finally {
             setLoading(false);
         }

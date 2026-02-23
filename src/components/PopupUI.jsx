@@ -69,7 +69,7 @@ export default function PopupUI() {
                                 storedFilter = JSON.parse(c.desc.replace('DASHCARD_CONFIG|', ''));
                             }
                         } catch (e) {
-                            console.log(e);
+                            // silently ignore
                         }
                     }
 
@@ -153,7 +153,7 @@ export default function PopupUI() {
                 setPreviewCount(matched.length);
                 setMatchedCards(matched);
             } catch (e) {
-                console.error("Error calculating active count:", e);
+
             }
         };
         const debounce = setTimeout(calculateActiveCount, 500);
@@ -182,8 +182,16 @@ export default function PopupUI() {
                     const rest = t.getRestApi();
                     if (await rest.isAuthorized()) {
                         token = await rest.getToken();
+                    } else {
+                        await rest.authorize({ scope: 'read,write', expiration: 'never' });
+                        token = await rest.getToken();
                     }
                 } catch (err) { /* ignore */ }
+
+                if (!token) {
+                    t.alert({ message: "Authorization is required to create a Dashcard. Please try again.", duration: 5, display: 'warning' });
+                    return;
+                }
 
                 // 1. Create the Dashcard (Using REST API because t.createCard is not a standard Power-Up client method for this context)
                 let newCard;
@@ -251,7 +259,7 @@ export default function PopupUI() {
                             });
                         }
                     } catch (imgErr) {
-                        console.error("Cover generation failed:", imgErr);
+
                     }
                 }
 
@@ -259,7 +267,7 @@ export default function PopupUI() {
                 setTimeout(closeWindow, 1000);
 
             } catch (e) {
-                console.error("Creation Error:", e);
+
                 t.alert({ message: "Error creating card", display: 'error' });
             }
 
@@ -293,7 +301,7 @@ export default function PopupUI() {
                         token = await rest.getToken();
                     }
                 } catch (authErr) {
-                    console.warn("REST API auth failed:", authErr);
+
                 }
 
                 if (token) {
@@ -326,7 +334,7 @@ export default function PopupUI() {
                                 ));
                             }
                         } catch (cleanupErr) {
-                            console.warn("Attachment cleanup failed:", cleanupErr);
+
                         }
 
                         const blob = await createCompositeImage(bg, previewCount, name);
@@ -357,7 +365,7 @@ export default function PopupUI() {
                             });
                         }
                     } catch (apiErr) {
-                        console.error("API Update failed:", apiErr);
+
                     }
                 }
             };
@@ -367,7 +375,7 @@ export default function PopupUI() {
                 t.alert({ message: "Dashcard updated!", duration: 2, display: 'success' });
                 setTimeout(closeWindow, 500);
             } catch (err) {
-                console.error("Update failed", err);
+
                 t.alert({ message: "Update failed.", display: 'error' });
             }
         }

@@ -46,7 +46,7 @@ export async function calculateMatchCount(t) {
             color: null
         }];
     } catch (e) {
-        console.error('Dashcard count failed:', e);
+
         return [];
     }
 }
@@ -77,7 +77,7 @@ export const getFilteredCards = async (t, filters) => {
             return true;
         });
     } catch (e) {
-        console.error("Filter logic error:", e);
+
         return [];
     }
 };
@@ -136,7 +136,7 @@ export const createCompositeImage = (bg, count, title) => {
                 drawContent();
             };
             img.onerror = (err) => {
-                console.error("Image load failed", err);
+
                 ctx.fillStyle = '#333333';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 drawContent();
