@@ -153,15 +153,17 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 function mount() {
 	if (isConnector) return;
 
-	const rootEl = document.getElementById("trello-popup-root") ||
-		document.getElementById("trello-dashboard-root") ||
-		document.getElementById("root") ||
-		document.body;
+    const rootEl = document.getElementById("trello-popup-root") ||
+        document.getElementById("trello-dashboard-root") ||
+        document.getElementById("app-container") || // Add this for detail.html
+        document.getElementById("root");
 
-	if (isDetail || window.location.href.includes("detail.html")) {
-		createRoot(rootEl).render(<DashCardDetails />);
-		return;
-	}
+    // Improved detail view detection
+    if (isDetail || window.location.pathname.includes("detail.html")) {
+        const detailRoot = document.getElementById("app-container") || rootEl;
+        createRoot(detailRoot).render(<DashCardDetails />);
+        return;
+    }
 
 	if (rootEl) {
 		const dashboardRoot = document.getElementById("trello-dashboard-root");
