@@ -413,8 +413,6 @@ export default function PopupUI() {
                             backgroundSize: 'cover',
                             backgroundPosition: 'center'
                         }}>
-
-// Locate the background picker grid (around line 316)
                             {BACKGROUNDS.map((b, i) => (
                                 <div key={i} className="bg-option" style={{
                                     // Ensure hex is prioritized for background colors
