@@ -46,18 +46,28 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 											const restApi = t.getRestApi();
 
 											await t.authorize(
-    'https://trello.com/1/authorize?' +
-    new URLSearchParams({
-        expiration: 'never',
-        name: 'Dashcard',
-        scope: 'read,write',
-        response_type: 'token',
-        key: APP_KEY,
-        return_url: `${window.location.origin}/auth.html`
-    }).toString()
-);
+												'https://trello.com/1/authorize?' +
+												new URLSearchParams({
+													expiration: 'never',
+													name: 'Dashcard',
+													scope: 'read,write',
+													response_type: 'token',
+													key: APP_KEY,
+													return_url: `${window.location.origin}/auth.html`
+												}).toString()
+											);
 
-											token = await t.get('member', 'private', 'token');
+											const token = await t.authorize(
+												'https://trello.com/1/authorize?' +
+												new URLSearchParams({
+													expiration: 'never',
+													name: 'Dashcard',
+													scope: 'read,write',
+													response_type: 'token',
+													key: APP_KEY,
+													return_url: `${window.location.origin}/auth.html`
+												}).toString()
+											);
 
 											if (token) {
 												const card = await t.card('id');

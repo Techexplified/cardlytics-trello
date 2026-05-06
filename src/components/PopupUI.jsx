@@ -178,18 +178,25 @@ export default function PopupUI() {
 
             try {
                 let token = null;
+
                 try {
-                    const restApi = t.getRestApi();
+                    token = await t.authorize(
+                        'https://trello.com/1/authorize?' +
+                        new URLSearchParams({
+                            expiration: 'never',
+                            name: 'Dashcard',
+                            scope: 'read,write',
+                            response_type: 'token',
+                            key: APP_KEY,
+                            return_url: `${window.location.origin}/auth.html`
+                        }).toString()
+                    );
 
-                    await restApi.authorize({
-                        scope: 'read,write',
-                        expiration: 'never'
-                    });
-
-                    token = await restApi.getToken();
                     console.log("TOKEN:", token);
 
-                } catch (err) { /* ignore */ }
+                } catch (err) {
+                    console.error(err);
+                }
 
                 if (!token) {
                     t.alert({ message: "Authorization is required to create a Dashcard. Please try again.", duration: 5, display: 'warning' });
@@ -301,9 +308,8 @@ export default function PopupUI() {
                 try {
                     const restApi = t.getRestApi();
 
-                    await restApi.authorize({
-                        scope: 'read,write',
-                        expiration: 'never'
+                    await restApi.put(`/cards/${newCard.id}`, {
+                        desc: descPayload
                     });
 
                     token = await restApi.getToken();
