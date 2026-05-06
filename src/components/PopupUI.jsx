@@ -186,9 +186,9 @@ export default function PopupUI() {
                         expiration: 'never'
                     });
 
-                    const token = await restApi.getToken();
+                    token = await restApi.getToken();
                     console.log("TOKEN:", token);
-                    
+
                 } catch (err) { /* ignore */ }
 
                 if (!token) {
@@ -234,31 +234,22 @@ export default function PopupUI() {
                         const blob = await createCompositeImage(bg, previewCount, name);
                         const formData = new FormData();
                         formData.append('file', blob, 'cover.png');
-                        formData.append('key', APP_KEY);
-                        formData.append('token', token);
 
                         // Upload attachment
-                        const attachRes = await fetch(
-                            `https://api.trello.com/1/cards/${newCard.id}/attachments`,
-                            { method: "POST", body: formData }
+                        const attachData = await restApi.post(
+                            `/cards/${newCard.id}/attachments`,
+                            formData
                         );
 
-                        if (attachRes.ok) {
-                            const attachData = await attachRes.json();
+                        await restApi.put(`/cards/${newCard.id}`, {
+                            cover: {
+                                idAttachment: attachData.id,
+                                color: null,
+                                size: "full",
+                                brightness: "dark"
+                            }
+                        });
 
-                            await fetch(`https://api.trello.com/1/cards/${newCard.id}?key=${APP_KEY}&token=${token}`, {
-                                method: "PUT",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    cover: {
-                                        idAttachment: attachData.id,
-                                        color: null,
-                                        size: "full",
-                                        brightness: "dark"
-                                    }
-                                })
-                            });
-                        }
                     } catch (imgErr) {
 
                     }
@@ -301,77 +292,48 @@ export default function PopupUI() {
                         expiration: 'never'
                     });
 
-                    const token = await restApi.getToken();
+                    token = await restApi.getToken();
                     console.log("TOKEN:", token);
-                    
+
                 } catch (authErr) {
 
                 }
 
                 if (token) {
-                    try {
-                        const cardId = card.id;
+    try {
+        const restApi = t.getRestApi();
 
-                        // Update name
-                        if (name) {
-                            await fetch(`https://api.trello.com/1/cards/${cardId}?key=${APP_KEY}&token=${token}`, {
-                                method: "PUT",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ name })
-                            });
-                        }
+        const cardId = card.id;
 
-                        // Update cover with composite image
-                        try {
-                            // Clean up previous attachments
-                            const existingAttachments = await fetch(
-                                `https://api.trello.com/1/cards/${cardId}/attachments?key=${APP_KEY}&token=${token}`,
-                                { method: "GET" }
-                            ).then(res => res.json());
+        if (name) {
+            await restApi.put(`/cards/${cardId}`, {
+                name
+            });
+        }
 
-                            if (Array.isArray(existingAttachments)) {
-                                await Promise.all(existingAttachments.map(att =>
-                                    fetch(
-                                        `https://api.trello.com/1/cards/${cardId}/attachments/${att.id}?key=${APP_KEY}&token=${token}`,
-                                        { method: "DELETE" }
-                                    )
-                                ));
-                            }
-                        } catch (cleanupErr) {
+        const blob = await createCompositeImage(bg, previewCount, name);
 
-                        }
+        const formData = new FormData();
+        formData.append('file', blob, 'cover.png');
 
-                        const blob = await createCompositeImage(bg, previewCount, name);
-                        const formData = new FormData();
-                        formData.append('file', blob, 'cover.png');
-                        formData.append('key', APP_KEY);
-                        formData.append('token', token);
+        const attachData = await restApi.post(
+            `/cards/${cardId}/attachments`,
+            formData
+        );
 
-                        const attachRes = await fetch(
-                            `https://api.trello.com/1/cards/${cardId}/attachments`,
-                            { method: "POST", body: formData }
-                        );
+        await restApi.put(`/cards/${cardId}`, {
+            cover: {
+                idAttachment: attachData.id,
+                color: null,
+                size: "full",
+                brightness: "dark"
+            }
+        });
 
-                        if (attachRes.ok) {
-                            const attachData = await attachRes.json();
+    } catch (apiErr) {
 
-                            await fetch(`https://api.trello.com/1/cards/${cardId}?key=${APP_KEY}&token=${token}`, {
-                                method: "PUT",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                    cover: {
-                                        idAttachment: attachData.id,
-                                        color: null,
-                                        size: "full",
-                                        brightness: "dark"
-                                    }
-                                })
-                            });
-                        }
-                    } catch (apiErr) {
-
-                    }
-                }
+    }
+}
             };
 
             try {

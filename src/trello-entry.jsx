@@ -19,8 +19,6 @@ const isConnector = !isPopup && !isDashboard && !isModal && !isSettings && !isDe
 
 if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 	window.TrelloPowerUp.initialize({
-		appKey: APP_KEY,
-		appName: 'Dashcards',
 		"card-buttons": function (t) {
 			return [{
 				icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
