@@ -4,7 +4,7 @@ import { searchUnsplashPhotos } from "../utils/unsplashApi";
 import { getUrlParam, createCompositeImage } from "../utils/helpers";
 
 export default function PopupUI() {
-    const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'Dashcards' }) : null;
+    const t = window.TrelloPowerUp ? window.TrelloPowerUp.iframe() : null;
     const [name, setName] = useState("Dashcard");
     const [bg, setBg] = useState(BACKGROUNDS[0]);
     const [showBgPicker, setShowBgPicker] = useState(false);
@@ -188,12 +188,7 @@ export default function PopupUI() {
 
                     const token = await restApi.getToken();
                     console.log("TOKEN:", token);
-                    if (await rest.isAuthorized()) {
-                        token = await rest.getToken();
-                    } else {
-                        await rest.authorize({ scope: 'read,write', expiration: 'never' });
-                        token = await rest.getToken();
-                    }
+                    
                 } catch (err) { /* ignore */ }
 
                 if (!token) {
@@ -203,18 +198,19 @@ export default function PopupUI() {
 
                 // 1. Create the Dashcard (Using REST API because t.createCard is not a standard Power-Up client method for this context)
                 let newCard;
-                const creationUrl = `https://api.trello.com/1/cards?idList=${targetListId}&name=${encodeURIComponent(name || "Dashcard")}&desc=Temporary config holder&pos=top&key=${APP_KEY}&token=${token}`;
+                const restApi = t.getRestApi();
 
-                const createRes = await fetch(creationUrl, {
-                    method: 'POST'
+                await restApi.authorize({
+                    scope: 'read,write',
+                    expiration: 'never'
                 });
 
-                if (!createRes.ok) {
-                    throw new Error("Failed to create card via API");
-                }
-
-                newCard = await createRes.json();
-
+                newCard = await restApi.post(`/cards`, {
+                    idList: targetListId,
+                    name: name || "Dashcard",
+                    desc: "Temporary config holder",
+                    pos: "top"
+                });
                 const updatedFilters = { listId: filters.listId, memberId: filters.memberId, labelId: filters.labelId, cardId: newCard.id };
                 setFilters(updatedFilters);
 
@@ -228,10 +224,8 @@ export default function PopupUI() {
 
                 const descPayload = `DASHCARD_CONFIG|${JSON.stringify(config)}`;
 
-                await fetch(`https://api.trello.com/1/cards/${newCard.id}?key=${APP_KEY}&token=${token || ""}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ desc: descPayload })
+                await restApi.put(`/cards/${newCard.id}`, {
+                    desc: descPayload
                 });
 
                 // 3. Generate and Set visual cover
@@ -309,12 +303,7 @@ export default function PopupUI() {
 
                     const token = await restApi.getToken();
                     console.log("TOKEN:", token);
-                    if (await rest.isAuthorized()) {
-                        token = await rest.getToken();
-                    } else {
-                        await rest.authorize({ scope: 'read,write', expiration: 'never' });
-                        token = await rest.getToken();
-                    }
+                    
                 } catch (authErr) {
 
                 }
@@ -496,41 +485,15 @@ export default function PopupUI() {
                         </select>
                     </div>
 
-                    <div className="dark-input-group">
-                        <label>List</label>
-                        {creationMode && (
-                            <div className="dark-input-group">
-                                <label>Create Dashcard In</label>
-                                <select
-                                    className="dark-select"
-                                    value={targetListId}
-                                    onChange={(e) => setTargetListId(e.target.value)}
-                                >
-                                    {Array.isArray(lists) &&
-                                        lists.map(l => (
-                                            <option key={l.id} value={l.id}>
-                                                {l.name}
-                                            </option>
-                                        ))}
-                                </select>
-                            </div>
-                        )}
-
+                    {creationMode && (
                         <div className="dark-input-group">
-                            <label>Filter By List</label>
+                            <label>Create Dashcard In</label>
 
                             <select
                                 className="dark-select"
-                                value={filters.listId}
-                                onChange={(e) =>
-                                    setFilters({
-                                        ...filters,
-                                        listId: e.target.value
-                                    })
-                                }
+                                value={targetListId}
+                                onChange={(e) => setTargetListId(e.target.value)}
                             >
-                                <option value="any">Any list</option>
-
                                 {Array.isArray(lists) &&
                                     lists.map(l => (
                                         <option key={l.id} value={l.id}>
@@ -539,6 +502,30 @@ export default function PopupUI() {
                                     ))}
                             </select>
                         </div>
+                    )}
+
+                    <div className="dark-input-group">
+                        <label>Filter By List</label>
+
+                        <select
+                            className="dark-select"
+                            value={filters.listId}
+                            onChange={(e) =>
+                                setFilters({
+                                    ...filters,
+                                    listId: e.target.value
+                                })
+                            }
+                        >
+                            <option value="any">Any list</option>
+
+                            {Array.isArray(lists) &&
+                                lists.map(l => (
+                                    <option key={l.id} value={l.id}>
+                                        {l.name}
+                                    </option>
+                                ))}
+                        </select>
                     </div>
 
                     <div className="dark-input-group">
