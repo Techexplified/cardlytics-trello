@@ -205,12 +205,26 @@ export default function PopupUI() {
                     expiration: 'never'
                 });
 
-                newCard = await restApi.post(`/cards`, {
-                    idList: targetListId,
-                    name: name || "Dashcard",
-                    desc: "Temporary config holder",
-                    pos: "top"
-                });
+                const createResponse = await fetch(
+    `https://api.trello.com/1/cards?idList=${targetListId}&name=${encodeURIComponent(name || "Dashcard")}&pos=top&key=${APP_KEY}&token=${token}`,
+    {
+        method: "POST"
+    }
+);
+
+if (!createResponse.ok) {
+    const errorText = await createResponse.text();
+    console.error(errorText);
+
+    t.alert({
+        message: "Failed to create Trello card",
+        display: "error"
+    });
+
+    return;
+}
+
+newCard = await createResponse.json();
                 const updatedFilters = { listId: filters.listId, memberId: filters.memberId, labelId: filters.labelId, cardId: newCard.id };
                 setFilters(updatedFilters);
 
