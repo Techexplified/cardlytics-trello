@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-import { DEPLOY_URL } from "./utils/constants";
+import { APP_KEY, DEPLOY_URL } from "./utils/constants";
 import { calculateMatchCount, createCompositeImage } from "./utils/helpers";
 import PopupUI from "./components/PopupUI";
 import DashboardUI from "./components/DashboardUI";
@@ -45,12 +45,19 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 										try {
 											const restApi = t.getRestApi();
 
-											await restApi.authorize({
-												scope: 'read,write',
-												expiration: 'never'
-											});
+											await t.authorize(
+    'https://trello.com/1/authorize?' +
+    new URLSearchParams({
+        expiration: 'never',
+        name: 'Dashcard',
+        scope: 'read,write',
+        response_type: 'token',
+        key: APP_KEY,
+        return_url: `${window.location.origin}/auth.html`
+    }).toString()
+);
 
-											const token = await restApi.getToken();
+											token = await t.get('member', 'private', 'token');
 
 											if (token) {
 												const card = await t.card('id');
@@ -155,6 +162,14 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 				}
 			}];
 		},
+
+		'authorization-status': function (t) {
+			return {
+				authorized: true
+			};
+		},
+
+
 		"show-settings": function (t) {
 			return t.popup({
 				title: 'Dashcard Settings',
