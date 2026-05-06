@@ -207,10 +207,6 @@ export default function PopupUI() {
                 let newCard;
                 const restApi = t.getRestApi();
 
-                await restApi.authorize({
-                    scope: 'read,write',
-                    expiration: 'never'
-                });
 
                 const createResponse = await fetch(
                     `https://api.trello.com/1/cards?idList=${targetListId}&name=${encodeURIComponent(name || "Dashcard")}&pos=top&key=${APP_KEY}&token=${token}`,
@@ -305,18 +301,24 @@ export default function PopupUI() {
                 await t.set('card', 'shared', 'isDashCard', true);
 
                 let token = null;
+
                 try {
-                    const restApi = t.getRestApi();
+                    token = await t.authorize(
+                        'https://trello.com/1/authorize?' +
+                        new URLSearchParams({
+                            expiration: 'never',
+                            name: 'Dashcard',
+                            scope: 'read,write',
+                            response_type: 'token',
+                            key: APP_KEY,
+                            return_url: `${window.location.origin}/auth.html`
+                        }).toString()
+                    );
 
-                    await restApi.put(`/cards/${newCard.id}`, {
-                        desc: descPayload
-                    });
-
-                    token = await restApi.getToken();
                     console.log("TOKEN:", token);
 
                 } catch (authErr) {
-
+                    console.error(authErr);
                 }
 
                 if (token) {
