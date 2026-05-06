@@ -2,7 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 
-import { APP_KEY, DEPLOY_URL } from "./utils/constants";
+import { DEPLOY_URL } from "./utils/constants";
 import { calculateMatchCount, createCompositeImage } from "./utils/helpers";
 import PopupUI from "./components/PopupUI";
 import DashboardUI from "./components/DashboardUI";
@@ -43,30 +43,45 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 									// Auto-update cover if count changed
 									if (filter.lastCount != count) {
 										try {
-											const rest = t.getRestApi();
-											if (await rest.isAuthorized()) {
-												const token = await rest.getToken();
-												if (token) {
-													const card = await t.card('id');
+											const restApi = t.getRestApi();
 
-													const blob = await createCompositeImage(filter.background, count, filter.name);
+											await restApi.authorize({
+												scope: 'read,write',
+												expiration: 'never'
+											});
 
-													const formData = new FormData();
-													formData.append('file', blob, 'cover.png');
-													formData.append('key', APP_KEY);
-													formData.append('token', token);
+											const token = await restApi.getToken();
 
-													const attachRes = await fetch(
-														`https://api.trello.com/1/cards/${card.id}/attachments`,
-														{ method: "POST", body: formData }
-													);
+											if (token) {
+												const card = await t.card('id');
 
-													if (attachRes.ok) {
-														const attachData = await attachRes.json();
-														// Set cover
-														await fetch(`https://api.trello.com/1/cards/${card.id}?key=${APP_KEY}&token=${token}`, {
+												const blob = await createCompositeImage(
+													filter.background,
+													count,
+													filter.name
+												);
+
+												const formData = new FormData();
+												formData.append('file', blob, 'cover.png');
+
+												const attachRes = await fetch(
+													`https://api.trello.com/1/cards/${card.id}/attachments?key=${APP_KEY}&token=${token}`,
+													{
+														method: "POST",
+														body: formData
+													}
+												);
+
+												if (attachRes.ok) {
+													const attachData = await attachRes.json();
+
+													await fetch(
+														`https://api.trello.com/1/cards/${card.id}?key=${APP_KEY}&token=${token}`,
+														{
 															method: "PUT",
-															headers: { "Content-Type": "application/json" },
+															headers: {
+																"Content-Type": "application/json"
+															},
 															body: JSON.stringify({
 																cover: {
 																	idAttachment: attachData.id,
@@ -75,19 +90,21 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 																	brightness: "dark"
 																}
 															})
-														});
+														}
+													);
 
-														// Cleanup old attachments (optional but good)
-														// Skipping for speed/simplicity in auto-update to avoid race conditions
+													filter.lastCount = count;
 
-														// Update stored lastCount
-														filter.lastCount = count;
-														await t.set('card', 'shared', 'dashFilter', filter);
-													}
+													await t.set(
+														'card',
+														'shared',
+														'dashFilter',
+														filter
+													);
 												}
 											}
 										} catch (err) {
-											// console.warn("Auto-update failed", err);
+											console.error(err);
 										}
 									}
 
@@ -151,17 +168,17 @@ if (isConnector && typeof window !== "undefined" && window.TrelloPowerUp) {
 function mount() {
 	if (isConnector) return;
 
-    const rootEl = document.getElementById("trello-popup-root") ||
-        document.getElementById("trello-dashboard-root") ||
-        document.getElementById("app-container") || // Add this for detail.html
-        document.getElementById("root");
+	const rootEl = document.getElementById("trello-popup-root") ||
+		document.getElementById("trello-dashboard-root") ||
+		document.getElementById("app-container") || // Add this for detail.html
+		document.getElementById("root");
 
-    // Improved detail view detection
-    if (isDetail || window.location.pathname.includes("detail.html")) {
-        const detailRoot = document.getElementById("app-container") || rootEl;
-        createRoot(detailRoot).render(<DashCardDetails />);
-        return;
-    }
+	// Improved detail view detection
+	if (isDetail || window.location.pathname.includes("detail.html")) {
+		const detailRoot = document.getElementById("app-container") || rootEl;
+		createRoot(detailRoot).render(<DashCardDetails />);
+		return;
+	}
 
 	if (rootEl) {
 		const dashboardRoot = document.getElementById("trello-dashboard-root");

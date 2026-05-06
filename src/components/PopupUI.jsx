@@ -206,25 +206,25 @@ export default function PopupUI() {
                 });
 
                 const createResponse = await fetch(
-    `https://api.trello.com/1/cards?idList=${targetListId}&name=${encodeURIComponent(name || "Dashcard")}&pos=top&key=${APP_KEY}&token=${token}`,
-    {
-        method: "POST"
-    }
-);
+                    `https://api.trello.com/1/cards?idList=${targetListId}&name=${encodeURIComponent(name || "Dashcard")}&pos=top&key=${APP_KEY}&token=${token}`,
+                    {
+                        method: "POST"
+                    }
+                );
 
-if (!createResponse.ok) {
-    const errorText = await createResponse.text();
-    console.error(errorText);
+                if (!createResponse.ok) {
+                    const errorText = await createResponse.text();
+                    console.error(errorText);
 
-    t.alert({
-        message: "Failed to create Trello card",
-        display: "error"
-    });
+                    t.alert({
+                        message: "Failed to create Trello card",
+                        display: "error"
+                    });
 
-    return;
-}
+                    return;
+                }
 
-newCard = await createResponse.json();
+                newCard = await createResponse.json();
                 const updatedFilters = { listId: filters.listId, memberId: filters.memberId, labelId: filters.labelId, cardId: newCard.id };
                 setFilters(updatedFilters);
 
@@ -314,40 +314,40 @@ newCard = await createResponse.json();
                 }
 
                 if (token) {
-    try {
-        const restApi = t.getRestApi();
+                    try {
+                        const restApi = t.getRestApi();
 
-        const cardId = card.id;
+                        const cardId = card.id;
 
-        if (name) {
-            await restApi.put(`/cards/${cardId}`, {
-                name
-            });
-        }
+                        if (name) {
+                            await restApi.put(`/cards/${cardId}`, {
+                                name
+                            });
+                        }
 
-        const blob = await createCompositeImage(bg, previewCount, name);
+                        const blob = await createCompositeImage(bg, previewCount, name);
 
-        const formData = new FormData();
-        formData.append('file', blob, 'cover.png');
+                        const formData = new FormData();
+                        formData.append('file', blob, 'cover.png');
 
-        const attachData = await restApi.post(
-            `/cards/${cardId}/attachments`,
-            formData
-        );
+                        const attachData = await restApi.post(
+                            `/cards/${cardId}/attachments`,
+                            formData
+                        );
 
-        await restApi.put(`/cards/${cardId}`, {
-            cover: {
-                idAttachment: attachData.id,
-                color: null,
-                size: "full",
-                brightness: "dark"
-            }
-        });
+                        await restApi.put(`/cards/${cardId}`, {
+                            cover: {
+                                idAttachment: attachData.id,
+                                color: null,
+                                size: "full",
+                                brightness: "dark"
+                            }
+                        });
 
-    } catch (apiErr) {
+                    } catch (apiErr) {
 
-    }
-}
+                    }
+                }
             };
 
             try {
