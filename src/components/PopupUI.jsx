@@ -179,7 +179,15 @@ export default function PopupUI() {
             try {
                 let token = null;
                 try {
-                    const rest = t.getRestApi();
+                    const restApi = t.getRestApi();
+
+                    await restApi.authorize({
+                        scope: 'read,write',
+                        expiration: 'never'
+                    });
+
+                    const token = await restApi.getToken();
+                    console.log("TOKEN:", token);
                     if (await rest.isAuthorized()) {
                         token = await rest.getToken();
                     } else {
@@ -214,7 +222,6 @@ export default function PopupUI() {
                     ...updatedFilters,
                     name,
                     background: bg,
-                    listId: targetListId,
                     cardId: newCard.id,
                     lastCount: previewCount
                 };
@@ -293,7 +300,15 @@ export default function PopupUI() {
 
                 let token = null;
                 try {
-                    const rest = t.getRestApi();
+                    const restApi = t.getRestApi();
+
+                    await restApi.authorize({
+                        scope: 'read,write',
+                        expiration: 'never'
+                    });
+
+                    const token = await restApi.getToken();
+                    console.log("TOKEN:", token);
                     if (await rest.isAuthorized()) {
                         token = await rest.getToken();
                     } else {
@@ -483,16 +498,47 @@ export default function PopupUI() {
 
                     <div className="dark-input-group">
                         <label>List</label>
-                        {creationMode ? (
-                            <select className="dark-select" value={targetListId} onChange={(e) => setTargetListId(e.target.value)}>
-                                {Array.isArray(lists) && lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                            </select>
-                        ) : (
-                            <select className="dark-select" value={filters.listId} onChange={(e) => setFilters({ ...filters, listId: e.target.value })}>
-                                <option value="any">Any list</option>
-                                {Array.isArray(lists) && lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                            </select>
+                        {creationMode && (
+                            <div className="dark-input-group">
+                                <label>Create Dashcard In</label>
+                                <select
+                                    className="dark-select"
+                                    value={targetListId}
+                                    onChange={(e) => setTargetListId(e.target.value)}
+                                >
+                                    {Array.isArray(lists) &&
+                                        lists.map(l => (
+                                            <option key={l.id} value={l.id}>
+                                                {l.name}
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
                         )}
+
+                        <div className="dark-input-group">
+                            <label>Filter By List</label>
+
+                            <select
+                                className="dark-select"
+                                value={filters.listId}
+                                onChange={(e) =>
+                                    setFilters({
+                                        ...filters,
+                                        listId: e.target.value
+                                    })
+                                }
+                            >
+                                <option value="any">Any list</option>
+
+                                {Array.isArray(lists) &&
+                                    lists.map(l => (
+                                        <option key={l.id} value={l.id}>
+                                            {l.name}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div className="dark-input-group">
