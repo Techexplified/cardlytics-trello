@@ -118,8 +118,7 @@ export default function PopupUI() {
                 const matched = allCards.filter(card => {
                     if (card.closed) return false;
 
-                    // Only filter out the ID if we are in Edit Mode (where cardId exists)
-                    if (filters && filters.cardId && card.id === filters.cardId) return false;
+                    if (filters.cardId && card.id === filters.cardId) return false;
 
                     if (filters.listId && filters.listId !== 'any' && card.idList !== filters.listId) return false;
                     if (filters.memberId && filters.memberId !== 'any') {
@@ -178,26 +177,19 @@ export default function PopupUI() {
             }
 
             try {
-                // Inside saveConfiguration, replace the existing token logic (around line 125 and line 203)
                 let token = null;
                 try {
                     const rest = t.getRestApi();
-                    const authorized = await rest.isAuthorized();
-                    if (!authorized) {
-                        // This will trigger the Trello authorization popup
+                    if (await rest.isAuthorized()) {
+                        token = await rest.getToken();
+                    } else {
                         await rest.authorize({ scope: 'read,write', expiration: 'never' });
+                        token = await rest.getToken();
                     }
-                    token = await rest.getToken();
-                } catch (err) {
-                    console.error("Auth failed", err);
-                }
+                } catch (err) { /* ignore */ }
 
                 if (!token) {
-                    t.alert({
-                        message: "Authorization is required to manage Dashcards. Please allow access.",
-                        duration: 5,
-                        display: 'warning'
-                    });
+                    t.alert({ message: "Authorization is required to create a Dashcard. Please try again.", duration: 5, display: 'warning' });
                     return;
                 }
 
@@ -405,25 +397,10 @@ export default function PopupUI() {
 
                 <div className="top-section">
                     <div className="preview-section">
-                        // Locate the preview-card div (around line 290)
                         <div className="preview-card" style={{
-                            // Use bg.hex if available, otherwise bg.value
-                            backgroundColor: bg.type === 'color' ? (bg.hex || bg.value) : '#0079bf',
-                            backgroundImage: bg.type === 'image' ? `url(${bg.value})` : 'none',
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center'
+                            backgroundColor: bg.type === 'color' ? (bg.hex || '#0079bf') : '#0065ff',
+                            backgroundImage: bg.type === 'image' ? `url(${bg.value})` : 'none'
                         }}>
-
-// Locate the background picker grid (around line 316)
-                            {BACKGROUNDS.map((b, i) => (
-                                <div key={i} className="bg-option" style={{
-                                    // Ensure hex is prioritized for background colors
-                                    backgroundColor: b.type === 'color' ? (b.hex || b.value) : '#ccc',
-                                    backgroundImage: b.type === 'image' ? `url(${b.value})` : 'none',
-                                    backgroundSize: 'cover',
-                                    height: '40px'
-                                }} onClick={() => { setBg(b); setShowBgPicker(false); }}></div>
-                            ))}
                             <div className="preview-count">{previewCount}</div>
                             <div className="preview-label">{name || 'Dashcard'}</div>
                         </div>
