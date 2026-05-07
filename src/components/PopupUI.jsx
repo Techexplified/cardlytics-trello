@@ -462,53 +462,78 @@ export default function PopupUI() {
 
                                     <div
                                         style={{
-                                            marginTop: "15px"
+                                            borderTop: "1px solid #383b45",
+                                            paddingTop: "10px",
+                                            marginTop: "10px"
                                         }}
                                     >
-                                        <input
-                                            type="text"
-                                            className="dark-input"
-                                            placeholder="Search Unsplash..."
-                                            value={unsplashQuery}
-                                            onChange={(e) =>
-                                                setUnsplashQuery(
-                                                    e.target.value
-                                                )
-                                            }
-                                        />
-
-                                        <button
-                                            className="btn btn-primary"
-                                            onClick={
-                                                handleUnsplashSearch
-                                            }
-                                            disabled={
-                                                isSearchingUnsplash
-                                            }
+                                        <label
+                                            style={{
+                                                fontSize: "12px",
+                                                color: "#9fadbc",
+                                                marginBottom: "5px",
+                                                display: "block"
+                                            }}
                                         >
-                                            Search
-                                        </button>
+                                            UNSPLASH
+                                        </label>
 
                                         <div
                                             style={{
-                                                display: "grid",
-                                                gridTemplateColumns:
-                                                    "repeat(3,1fr)",
-                                                gap: "8px",
-                                                marginTop: "10px"
+                                                display: "flex",
+                                                gap: "5px",
+                                                marginBottom: "10px"
                                             }}
                                         >
-                                            {unsplashImages.map(
-                                                (img) => (
+                                            <input
+                                                type="text"
+                                                className="dark-input"
+                                                style={{
+                                                    padding: "6px",
+                                                    fontSize: "12px"
+                                                }}
+                                                placeholder="Search photos..."
+                                                value={unsplashQuery}
+                                                onChange={(e) =>
+                                                    setUnsplashQuery(e.target.value)
+                                                }
+                                                onKeyDown={(e) =>
+                                                    e.key === "Enter" &&
+                                                    handleUnsplashSearch()
+                                                }
+                                            />
+
+                                            <button
+                                                className="btn btn-primary"
+                                                style={{
+                                                    padding: "6px 10px",
+                                                    fontSize: "12px"
+                                                }}
+                                                onClick={handleUnsplashSearch}
+                                                disabled={isSearchingUnsplash}
+                                            >
+                                                Search
+                                            </button>
+                                        </div>
+
+                                        {unsplashImages.length > 0 && (
+                                            <div
+                                                style={{
+                                                    display: "grid",
+                                                    gridTemplateColumns:
+                                                        "repeat(3, 1fr)",
+                                                    gap: "8px"
+                                                }}
+                                            >
+                                                {unsplashImages.map((img) => (
                                                     <div
                                                         key={img.id}
                                                         className="bg-option"
                                                         style={{
-                                                            backgroundImage:
-                                                                `url(${img.thumb})`,
-                                                            backgroundSize:
-                                                                "cover",
-                                                            height: "60px"
+                                                            backgroundImage: `url(${img.thumb})`,
+                                                            backgroundSize: "cover",
+                                                            height: "60px",
+                                                            borderRadius: "4px"
                                                         }}
                                                         onClick={() => {
                                                             setBg({
@@ -519,9 +544,23 @@ export default function PopupUI() {
                                                             setShowBgPicker(false);
                                                         }}
                                                     />
-                                                )
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {unsplashImages.length === 0 &&
+                                            !isSearchingUnsplash &&
+                                            unsplashQuery && (
+                                                <div
+                                                    style={{
+                                                        fontSize: "12px",
+                                                        color: "#9fadbc",
+                                                        textAlign: "center"
+                                                    }}
+                                                >
+                                                    No results
+                                                </div>
                                             )}
-                                        </div>
                                     </div>
                                 </div>
                             )}
