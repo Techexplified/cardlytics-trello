@@ -469,6 +469,7 @@ export default function PopupUI() {
                                             paddingTop: "10px"
                                         }}
                                     >
+                                        <br></br>
                                         <div
                                             style={{
                                                 fontSize: "12px",
