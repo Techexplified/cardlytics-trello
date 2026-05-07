@@ -1,35 +1,30 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import mkcert from "vite-plugin-mkcert";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default defineConfig({
-  base: "./",
-  plugins: [react(), mkcert()],
+  plugins: [react()],
+
   build: {
     rollupOptions: {
       input: {
-        index: path.resolve(__dirname, "index.html"),
-        card: path.resolve(__dirname, "card-button.html"),
+        main: path.resolve(__dirname, "index.html"),
         popup: path.resolve(__dirname, "popup.html"),
         dashboard: path.resolve(__dirname, "dashboard.html"),
-        settings: path.resolve(__dirname, "settings.html"),
-        testConnector: path.resolve(__dirname, "settings-connector-test.html"),
         detail: path.resolve(__dirname, "detail.html"),
-      },
-    },
+        settings: path.resolve(__dirname, "settings.html"),
+        auth: path.resolve(__dirname, "auth.html"),
+        cardButton: path.resolve(__dirname, "card-button.html")
+      }
+    }
   },
+
   server: {
-    https: true,
-    proxy: {
-      "/api": {
-        target: "http://localhost:5173",
-        changeOrigin: true,
-      },
-    },
-  },
+    host: "0.0.0.0",
+    port: 5173
+  }
 });
