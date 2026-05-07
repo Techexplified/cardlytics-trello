@@ -17,7 +17,7 @@ export default function PopupUI() {
     const [members, setMembers] = useState({});
     const [loading, setLoading] = useState(true);
 
-    const creationMode = getUrlParam("mode") === "create";
+    const creationMode = true;
     const [targetListId, setTargetListId] = useState("");
 
     const [unsplashQuery, setUnsplashQuery] = useState("");
