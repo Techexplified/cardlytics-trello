@@ -303,7 +303,7 @@ export default function PopupUI() {
                 let token = null;
 
                 try {
-                    token = await t.authorize(
+                    const authUrl =
                         'https://trello.com/1/authorize?' +
                         new URLSearchParams({
                             expiration: 'never',
@@ -312,13 +312,30 @@ export default function PopupUI() {
                             response_type: 'token',
                             key: APP_KEY,
                             return_url: `${window.location.origin}/auth.html`
-                        }).toString()
-                    );
+                        }).toString();
 
-                    console.log("TOKEN:", token);
+                    window.open(authUrl, '_blank', 'width=600,height=700');
 
-                } catch (authErr) {
-                    console.error(authErr);
+                    token = await new Promise((resolve) => {
+                        window.addEventListener(
+                            'message',
+                            function handler(event) {
+                                if (
+                                    event.data &&
+                                    event.data.type === 'TRELLO_TOKEN'
+                                ) {
+                                    window.removeEventListener('message', handler);
+
+                                    resolve(event.data.token);
+                                }
+                            }
+                        );
+                    });
+
+                    localStorage.setItem("trello_token", token);
+
+                } catch (err) {
+                    console.error(err);
                 }
 
                 if (token) {
