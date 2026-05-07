@@ -418,80 +418,84 @@ export default function PopupUI() {
                                     style={{
                                         width: "320px",
                                         maxHeight: "400px",
-                                        overflowY: "auto"
+                                        overflowY: "auto",
+                                        padding: "12px",
+                                        background: "#1f2229",
+                                        border: "1px solid #383b45",
+                                        borderRadius: "8px"
                                     }}
                                 >
 
+                                    {/* COLORS */}
                                     <div
                                         style={{
                                             display: "grid",
-                                            gridTemplateColumns:
-                                                "repeat(5,1fr)",
+                                            gridTemplateColumns: "repeat(5, 1fr)",
                                             gap: "8px"
                                         }}
                                     >
-                                        {BACKGROUNDS.map(
-                                            (b, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="bg-option"
-                                                    style={{
-                                                        backgroundColor:
-                                                            b.type === "color"
-                                                                ? (b.hex || b.value)
-                                                                : "#ccc",
+                                        {BACKGROUNDS.map((b, i) => (
+                                            <div
+                                                key={i}
+                                                className="bg-option"
+                                                style={{
+                                                    backgroundColor:
+                                                        b.type === "color"
+                                                            ? (b.hex || b.value)
+                                                            : "#ccc",
 
-                                                        backgroundImage:
-                                                            b.type === "image"
-                                                                ? `url(${b.value})`
-                                                                : "none",
+                                                    backgroundImage:
+                                                        b.type === "image"
+                                                            ? `url(${b.value})`
+                                                            : "none",
 
-                                                        backgroundSize:
-                                                            "cover",
-
-                                                        height: "40px"
-                                                    }}
-                                                    onClick={() => {
-                                                        setBg(b);
-                                                        setShowBgPicker(false);
-                                                    }}
-                                                />
-                                            )
-                                        )}
+                                                    backgroundSize: "cover",
+                                                    backgroundPosition: "center",
+                                                    height: "40px",
+                                                    borderRadius: "6px",
+                                                    cursor: "pointer"
+                                                }}
+                                                onClick={() => {
+                                                    setBg(b);
+                                                    setShowBgPicker(false);
+                                                }}
+                                            />
+                                        ))}
                                     </div>
 
+                                    {/* UNSPLASH */}
                                     <div
                                         style={{
                                             borderTop: "1px solid #383b45",
-                                            paddingTop: "10px",
-                                            marginTop: "10px"
+                                            paddingTop: "12px",
+                                            marginTop: "12px"
                                         }}
                                     >
                                         <label
                                             style={{
                                                 fontSize: "12px",
                                                 color: "#9fadbc",
-                                                marginBottom: "5px",
-                                                display: "block"
+                                                marginBottom: "8px",
+                                                display: "block",
+                                                fontWeight: 500
                                             }}
                                         >
                                             UNSPLASH
                                         </label>
 
+                                        {/* SEARCH BAR */}
                                         <div
                                             style={{
                                                 display: "flex",
-                                                gap: "5px",
-                                                marginBottom: "10px"
+                                                alignItems: "center",
+                                                gap: "8px",
+                                                width: "100%",
+                                                marginBottom: "12px"
                                             }}
                                         >
                                             <input
                                                 type="text"
                                                 className="dark-input"
-                                                style={{
-                                                    padding: "6px",
-                                                    fontSize: "12px"
-                                                }}
                                                 placeholder="Search photos..."
                                                 value={unsplashQuery}
                                                 onChange={(e) =>
@@ -501,21 +505,30 @@ export default function PopupUI() {
                                                     e.key === "Enter" &&
                                                     handleUnsplashSearch()
                                                 }
+                                                style={{
+                                                    flex: 1,
+                                                    minWidth: 0,
+                                                    padding: "8px",
+                                                    fontSize: "12px"
+                                                }}
                                             />
 
                                             <button
                                                 className="btn btn-primary"
-                                                style={{
-                                                    padding: "6px 10px",
-                                                    fontSize: "12px"
-                                                }}
                                                 onClick={handleUnsplashSearch}
                                                 disabled={isSearchingUnsplash}
+                                                style={{
+                                                    padding: "8px 12px",
+                                                    fontSize: "12px",
+                                                    whiteSpace: "nowrap",
+                                                    flexShrink: 0
+                                                }}
                                             >
                                                 Search
                                             </button>
                                         </div>
 
+                                        {/* RESULTS */}
                                         {unsplashImages.length > 0 && (
                                             <div
                                                 style={{
@@ -530,10 +543,13 @@ export default function PopupUI() {
                                                         key={img.id}
                                                         className="bg-option"
                                                         style={{
-                                                            backgroundImage: `url(${img.thumb})`,
+                                                            backgroundImage:
+                                                                `url(${img.thumb})`,
                                                             backgroundSize: "cover",
+                                                            backgroundPosition: "center",
                                                             height: "60px",
-                                                            borderRadius: "4px"
+                                                            borderRadius: "6px",
+                                                            cursor: "pointer"
                                                         }}
                                                         onClick={() => {
                                                             setBg({
@@ -548,6 +564,7 @@ export default function PopupUI() {
                                             </div>
                                         )}
 
+                                        {/* EMPTY STATE */}
                                         {unsplashImages.length === 0 &&
                                             !isSearchingUnsplash &&
                                             unsplashQuery && (
@@ -555,7 +572,8 @@ export default function PopupUI() {
                                                     style={{
                                                         fontSize: "12px",
                                                         color: "#9fadbc",
-                                                        textAlign: "center"
+                                                        textAlign: "center",
+                                                        marginTop: "8px"
                                                     }}
                                                 >
                                                     No results
