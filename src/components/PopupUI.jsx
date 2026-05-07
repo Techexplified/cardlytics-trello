@@ -228,6 +228,7 @@ export default function PopupUI() {
                 }
 
                 newCard = await createResponse.json();
+                console.log("CARD CREATED:", newCard);
                 const updatedFilters = { listId: filters.listId, memberId: filters.memberId, labelId: filters.labelId, cardId: newCard.id };
                 setFilters(updatedFilters);
 
@@ -300,42 +301,63 @@ export default function PopupUI() {
                 await t.set('card', 'shared', 'dashFilter', config);
                 await t.set('card', 'shared', 'isDashCard', true);
 
-                let token = null;
+                let token = localStorage.getItem("trello_token");
 
-                try {
-                    const authUrl =
-                        'https://trello.com/1/authorize?' +
-                        new URLSearchParams({
-                            expiration: 'never',
-                            name: 'Dashcard',
-                            scope: 'read,write',
-                            response_type: 'token',
-                            key: APP_KEY,
-                            return_url: `${window.location.origin}/auth.html`
-                        }).toString();
+                if (!token) {
+                    try {
+                        const authUrl =
+                            'https://trello.com/1/authorize?' +
+                            new URLSearchParams({
+                                expiration: 'never',
+                                name: 'Dashcard',
+                                scope: 'read,write',
+                                response_type: 'token',
+                                key: APP_KEY,
+                                return_url: `${window.location.origin}/auth.html`
+                            }).toString();
 
-                    window.open(authUrl, '_blank', 'width=600,height=700');
-
-                    token = await new Promise((resolve) => {
-                        window.addEventListener(
-                            'message',
-                            function handler(event) {
-                                if (
-                                    event.data &&
-                                    event.data.type === 'TRELLO_TOKEN'
-                                ) {
-                                    window.removeEventListener('message', handler);
-
-                                    resolve(event.data.token);
-                                }
-                            }
+                        const authWindow = window.open(
+                            authUrl,
+                            '_blank',
+                            'width=600,height=700'
                         );
+
+                        token = await new Promise((resolve) => {
+                            window.addEventListener(
+                                'message',
+                                function handler(event) {
+                                    if (
+                                        event.data &&
+                                        event.data.type === 'TRELLO_TOKEN'
+                                    ) {
+                                        window.removeEventListener('message', handler);
+
+                                        resolve(event.data.token);
+                                    }
+                                }
+                            );
+                        });
+
+                        localStorage.setItem("trello_token", token);
+
+                        if (authWindow) {
+                            authWindow.close();
+                        }
+
+                    } catch (err) {
+                        console.error(err);
+                    }
+                }
+
+                console.log("TOKEN RECEIVED:", token);
+
+                if (!token) {
+                    t.alert({
+                        message: "Authorization failed",
+                        display: "error"
                     });
 
-                    localStorage.setItem("trello_token", token);
-
-                } catch (err) {
-                    console.error(err);
+                    return;
                 }
 
                 if (token) {
