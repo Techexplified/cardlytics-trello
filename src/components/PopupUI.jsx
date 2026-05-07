@@ -50,6 +50,75 @@ export default function PopupUI() {
         setIsSearchingUnsplash(false);
     };
 
+    const pickerStyles = {
+        dropdown: {
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            width: "320px",
+            backgroundColor: "#1d2125",
+            border: "1px solid #38414a",
+            borderRadius: "8px",
+            padding: "12px",
+            zIndex: 100,
+            boxShadow: "0 8px 16px rgba(0,0,0,0.4)",
+            marginTop: "8px"
+        },
+        grid: {
+            display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gap: "8px",
+        },
+        option: (b) => ({
+            backgroundColor: b.type === "color" ? (b.hex || b.value) : "#333",
+            backgroundImage: b.type === "image" ? `url(${b.value})` : "none",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            height: "42px",
+            borderRadius: "4px",
+            cursor: "pointer"
+        }),
+        divider: {
+            border: 0,
+            borderTop: "1px solid #38414a",
+            margin: "12px 0",
+        },
+        label: {
+            fontSize: "12px",
+            color: "#9fadbc",
+            marginBottom: "8px",
+            fontWeight: "600",
+            display: "block"
+        },
+        searchRow: {
+            display: "flex",
+            alignItems: "center",
+            gap: "8px"
+        },
+        input: {
+            flex: 1,
+            height: "32px",
+            backgroundColor: "#22272b",
+            border: "1px solid #444c56",
+            borderRadius: "4px",
+            color: "#b6c2cf",
+            padding: "0 10px",
+            fontSize: "14px",
+            outline: "none"
+        },
+        goBtn: {
+            height: "32px",
+            backgroundColor: "#579dff",
+            color: "#1d2125",
+            border: "none",
+            borderRadius: "4px",
+            padding: "0 14px",
+            fontWeight: "600",
+            cursor: "pointer",
+            fontSize: "14px"
+        }
+    };
+
     useEffect(() => {
         if (!t) return;
 
@@ -413,46 +482,37 @@ export default function PopupUI() {
                             </div>
 
                             {showBgPicker && (
-                                <div
-                                    className="bg-picker-grid"
-                                    style={{
-                                        width: "320px",
-                                        background: "#1f2229",
-                                        border: "1px solid #383b45",
-                                        borderRadius: "6px",
-                                        padding: "12px"
-                                    }}
-                                >
-
-                                    {/* COLOR GRID */}
-                                    <div
-                                        style={{
-                                            display: "grid",
-                                            gridTemplateColumns: "repeat(5, 1fr)",
-                                            gap: "8px",
-                                            marginBottom: "12px"
-                                        }}
-                                    >
+                                <div style={{
+                                    position: "absolute",
+                                    top: "100%",
+                                    left: 0,
+                                    width: "320px",
+                                    backgroundColor: "#1d2125",
+                                    border: "1px solid #38414a",
+                                    borderRadius: "8px",
+                                    padding: "12px",
+                                    zIndex: 100,
+                                    boxShadow: "0 8px 16px rgba(0,0,0,0.4)",
+                                    marginTop: "8px"
+                                }}>
+                                    {/* 1. PRESET COLORS/IMAGES GRID */}
+                                    <div style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "repeat(5, 1fr)",
+                                        gap: "8px",
+                                    }}>
                                         {BACKGROUNDS.map((b, i) => (
                                             <div
                                                 key={i}
-                                                className="bg-option"
                                                 style={{
-                                                    backgroundColor:
-                                                        b.type === "color"
-                                                            ? (b.hex || b.value)
-                                                            : "#ccc",
-
-                                                    backgroundImage:
-                                                        b.type === "image"
-                                                            ? `url(${b.value})`
-                                                            : "none",
-
+                                                    backgroundColor: b.type === "color" ? (b.hex || b.value) : "#333",
+                                                    backgroundImage: b.type === "image" ? `url(${b.value})` : "none",
                                                     backgroundSize: "cover",
                                                     backgroundPosition: "center",
                                                     height: "42px",
                                                     borderRadius: "4px",
-                                                    cursor: "pointer"
+                                                    cursor: "pointer",
+                                                    border: bg === b ? "2px solid #579dff" : "none"
                                                 }}
                                                 onClick={() => {
                                                     setBg(b);
@@ -462,86 +522,83 @@ export default function PopupUI() {
                                         ))}
                                     </div>
 
-                                    {/* UNSPLASH LABEL */}
-                                    <div
-                                        style={{
-                                            borderTop: "1px solid #383b45",
-                                            paddingTop: "10px"
-                                        }}
-                                    >
-                                        <br></br>
-                                        <div
-                                            style={{
-                                                fontSize: "12px",
-                                                color: "#9fadbc",
-                                                marginBottom: "8px",
-                                                fontWeight: 500
-                                            }}
-                                        >
-                                            UNSPLASH
-                                        </div>
+                                    {/* 2. THE VISUAL DIVIDER */}
+                                    <hr style={{
+                                        border: 0,
+                                        borderTop: "1px solid #38414a",
+                                        margin: "12px 0",
+                                    }} />
 
-                                        {/* SEARCH ROW */}
-                                        <div
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "6px"
-                                            }}
-                                        >
+                                    {/* 3. UNSPLASH SEARCH SECTION */}
+                                    <div className="unsplash-section">
+                                        <label style={{
+                                            fontSize: "12px",
+                                            color: "#9fadbc",
+                                            marginBottom: "8px",
+                                            fontWeight: "600",
+                                            display: "block",
+                                            letterSpacing: "0.5px"
+                                        }}>
+                                            UNSPLASH
+                                        </label>
+
+                                        <div style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "8px"
+                                        }}>
                                             <input
                                                 type="text"
-                                                className="dark-input"
-                                                placeholder="Search photos..."
-                                                value={unsplashQuery}
-                                                onChange={(e) =>
-                                                    setUnsplashQuery(e.target.value)
-                                                }
-                                                onKeyDown={(e) =>
-                                                    e.key === "Enter" &&
-                                                    handleUnsplashSearch()
-                                                }
                                                 style={{
                                                     flex: 1,
                                                     height: "32px",
-                                                    fontSize: "12px",
-                                                    padding: "0 10px"
+                                                    backgroundColor: "#22272b",
+                                                    border: "1px solid #444c56",
+                                                    borderRadius: "4px",
+                                                    color: "#b6c2cf",
+                                                    padding: "0 10px",
+                                                    fontSize: "14px",
+                                                    outline: "none"
                                                 }}
+                                                placeholder="Search photos..."
+                                                value={unsplashQuery}
+                                                onChange={(e) => setUnsplashQuery(e.target.value)}
+                                                onKeyDown={(e) => e.key === "Enter" && handleUnsplashSearch()}
                                             />
-
                                             <button
-                                                className="btn btn-primary"
-                                                onClick={handleUnsplashSearch}
-                                                disabled={isSearchingUnsplash}
                                                 style={{
                                                     height: "32px",
+                                                    backgroundColor: "#579dff",
+                                                    color: "#1d2125",
+                                                    border: "none",
+                                                    borderRadius: "4px",
                                                     padding: "0 14px",
-                                                    fontSize: "12px",
-                                                    whiteSpace: "nowrap"
+                                                    fontWeight: "600",
+                                                    cursor: "pointer",
+                                                    fontSize: "14px"
                                                 }}
+                                                onClick={handleUnsplashSearch}
+                                                disabled={isSearchingUnsplash}
                                             >
-                                                Go
+                                                {isSearchingUnsplash ? "..." : "Go"}
                                             </button>
                                         </div>
 
-                                        {/* RESULTS */}
+                                        {/* 4. SEARCH RESULTS (Conditional) */}
                                         {unsplashImages.length > 0 && (
-                                            <div
-                                                style={{
-                                                    display: "grid",
-                                                    gridTemplateColumns:
-                                                        "repeat(3, 1fr)",
-                                                    gap: "8px",
-                                                    marginTop: "10px"
-                                                }}
-                                            >
+                                            <div style={{
+                                                display: "grid",
+                                                gridTemplateColumns: "repeat(3, 1fr)",
+                                                gap: "8px",
+                                                marginTop: "12px",
+                                                maxHeight: "160px",
+                                                overflowY: "auto"
+                                            }}>
                                                 {unsplashImages.map((img) => (
                                                     <div
                                                         key={img.id}
-                                                        className="bg-option"
                                                         style={{
-                                                            backgroundImage:
-                                                                `url(${img.thumb})`,
+                                                            backgroundImage: `url(${img.thumb})`,
                                                             backgroundSize: "cover",
                                                             backgroundPosition: "center",
                                                             height: "60px",
@@ -549,11 +606,7 @@ export default function PopupUI() {
                                                             cursor: "pointer"
                                                         }}
                                                         onClick={() => {
-                                                            setBg({
-                                                                type: "image",
-                                                                value: img.url
-                                                            });
-
+                                                            setBg({ type: "image", value: img.url });
                                                             setShowBgPicker(false);
                                                         }}
                                                     />
@@ -562,20 +615,16 @@ export default function PopupUI() {
                                         )}
 
                                         {/* EMPTY STATE */}
-                                        {unsplashImages.length === 0 &&
-                                            !isSearchingUnsplash &&
-                                            unsplashQuery && (
-                                                <div
-                                                    style={{
-                                                        fontSize: "12px",
-                                                        color: "#9fadbc",
-                                                        textAlign: "center",
-                                                        marginTop: "10px"
-                                                    }}
-                                                >
-                                                    No results
-                                                </div>
-                                            )}
+                                        {unsplashImages.length === 0 && !isSearchingUnsplash && unsplashQuery && (
+                                            <div style={{
+                                                fontSize: "12px",
+                                                color: "#9fadbc",
+                                                textAlign: "center",
+                                                marginTop: "10px"
+                                            }}>
+                                                No results found
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
